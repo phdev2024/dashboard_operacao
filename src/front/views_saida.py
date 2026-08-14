@@ -1,5 +1,5 @@
 """
-Módulo Frontend: Visão de Status de Saída (Gráfico Plotly com Rótulos + Status Mês Atual)
+Módulo Frontend: Visão de Status de Saída (Layout Moderno & Atualizado)
 """
 
 import streamlit as st
@@ -15,7 +15,6 @@ from src.config.settings import (
 from src.core.metrics import (
     calcular_total_notas_unicas, 
     obter_resumo_por_status_mes_atual,
-    obter_evolucao_diaria_mes_atual,
     obter_evolucao_diaria_mes_atual
 )
 
@@ -24,18 +23,24 @@ def renderizar_css_tv():
     st.markdown(
         f"""
         <style>
+            /* Reduz a margem superior padrão do Streamlit */
             .block-container {{
-                padding-top: 1.5rem !important;
+                padding-top: 1.2rem !important;
                 padding-bottom: 1rem !important;
                 padding-left: 2rem !important;
                 padding-right: 2rem !important;
             }}
-            #MainMenu {{visibility: hidden;}}
-            footer {{visibility: hidden;}}
+            /* Remove a barra padrão do topo */
             header {{visibility: hidden;}}
-            .stApp {{ background-color: #0B1311; }}
+            
+            /* Remove a opacidade forçada durante o carregamento */
+            .stApp {{
+                opacity: 1 !important;
+            }}
+            
+            /* Estilo dos Cards de KPI */
             .kpi-card {{
-                background-color: {COLOR_CARD_BG};
+                background-color: #162421;
                 border: 1px solid #223834;
                 border-radius: 10px;
                 padding: 12px;
@@ -43,7 +48,7 @@ def renderizar_css_tv():
                 box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
             }}
             .kpi-title {{
-                color: {COLOR_TEXT_MUTED};
+                color: #8DAA9D;
                 font-size: 0.8rem;
                 font-weight: 600;
                 text-transform: uppercase;
@@ -56,7 +61,7 @@ def renderizar_css_tv():
                 line-height: 1.1;
             }}
             .header-title {{
-                color: {COLOR_TEXT_LIGHT};
+                color: #FFFFFF;
                 font-size: 1.8rem;
                 font-weight: 800;
                 margin: 0;
@@ -72,7 +77,7 @@ def exibir_visao_saida(df: pd.DataFrame):
 
     # --- 1. CABEÇALHO COMPACTO ---
     caminho_logo = Path("data/media/logo_logcare.png")
-    c1, c2 = st.columns([3.5, 8.5], vertical_alignment="center")
+    c1, c2 = st.columns([1.5, 8.5], vertical_alignment="center")
     
     with c1:
         if caminho_logo.exists():
@@ -89,43 +94,61 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.warning("⚠️ Nenhum dado operacional encontrado para o ano de 2026.")
         return
 
-    # --- 2. CÁLCULO DAS MÉTRICAS ---
-    total_nfs_ano = calcular_total_notas_unicas(df)
-    
-    # 1. Tabela de status exclusiva do MÊS ATUAL
-    df_status_mes = obter_resumo_por_status_mes_atual(df, coluna_data="Recepção")
-
-    # 2. Filtragem direta das Pendências no Mês Atual (à prova de falhas)
-    status_pendentes_busca = ["EM SEPARACAO", "EM SEPARAÇÃO", "PENDENTE", "EM CONFERENCIA", "EM CONFERÊNCIA", "AGUARDANDO EXPEDICAO", "AGUARDANDO EXPEDIÇÃO"]
-    
-    if "Recepção" in df.columns and "Status" in df.columns:
+    # --- 2. FILTRO GLOBAL DO MÊS ATUAL & CÁLCULOS ---
+    if "Recepção" in df.columns:
         df_temp = df.copy()
         df_temp["Recepção"] = pd.to_datetime(df_temp["Recepção"], errors="coerce")
-        data_maxima = df_temp["Recepção"].max()
+        df_temp = df_temp.dropna(subset=["Recepção"])
         
-        # Filtra o mês atual e os status pendentes
-        df_pendentes_mes = df_temp[
-            (df_temp["Recepção"].dt.year == data_maxima.year) & 
-            (df_temp["Recepção"].dt.month == data_maxima.month) &
-            (df_temp["Status"].astype(str).str.strip().str.upper().isin(status_pendentes_busca))
-        ]
+        if not df_temp.empty:
+            data_maxima = df_temp["Recepção"].max()
+            ano_atual = data_maxima.year
+            mes_atual = data_maxima.month
+            nome_mes_ano = data_maxima.strftime("%m/%Y")
+            data_hoje_str = data_maxima.strftime("%d/%m")
+            
+            # DataFrame 100% filtrado apenas para o Mês Atual
+            df_mes = df_temp[(df_temp["Recepção"].dt.year == ano_atual) & (df_temp["Recepção"].dt.month == mes_atual)]
+            
+            # Dados do Dia mais recente
+            df_hoje = df_mes[df_mes["Recepção"].dt.date == data_maxima.date()]
+            total_hoje = calcular_total_notas_unicas(df_hoje)
+        else:
+            df_mes = pd.DataFrame()
+            nome_mes_ano = "Mês Atual"
+            data_hoje_str = "Hoje"
+            total_hoje = 0
+    else:
+        df_mes = df.copy()
+        nome_mes_ano = "Mês Atual"
+        data_hoje_str = "Hoje"
+        total_hoje = 0
+
+    # Cálculos exclusivos do Mês Atual
+    total_nfs_mes = calcular_total_notas_unicas(df_mes)
+    df_status_mes = obter_resumo_por_status_mes_atual(df, coluna_data="Recepção")
+
+    # Expedidas no Mês
+    df_expedidas_mes = df_mes[df_mes["Status"] == "EXPEDIDO"] if "Status" in df_mes.columns else pd.DataFrame()
+    total_expedidas_mes = calcular_total_notas_unicas(df_expedidas_mes)
+
+    # Pendências Operacionais no Mês
+    status_finalizados = ["EXPEDIDO", "CANCELADA", "REJEITADA", "CANCELADO", "REJEITADO"]
+    if "Status" in df_mes.columns:
+        df_pendentes_mes = df_mes[~df_mes["Status"].astype(str).str.strip().str.upper().isin(status_finalizados)]
         total_pendentes = calcular_total_notas_unicas(df_pendentes_mes)
     else:
         total_pendentes = 0
 
-    # Expedidas no Ano
-    df_expedidas = df[df["Status"] == "EXPEDIDO"] if "Status" in df.columns else pd.DataFrame()
-    total_expedidas = calcular_total_notas_unicas(df_expedidas)
-
-    # --- 3. LINHA DE CARDS ---
+    # --- 3. LINHA DE 4 CARDS (100% MÊS ATUAL) ---
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Total Acumulado (2026)</div>
-                <div class='kpi-value' style='color: {COLOR_BRAND_PRIMARY};'>{total_nfs_ano:,}</div>
+                <div class='kpi-title'>Total Recebido ({nome_mes_ano})</div>
+                <div class='kpi-value' style='color: {COLOR_BRAND_PRIMARY};'>{total_nfs_mes:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
@@ -134,8 +157,8 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Expedidas (Concluídas)</div>
-                <div class='kpi-value' style='color: {COLOR_SUCCESS};'>{total_expedidas:,}</div>
+                <div class='kpi-title'>Expedidas no Mês</div>
+                <div class='kpi-value' style='color: {COLOR_SUCCESS};'>{total_expedidas_mes:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
@@ -152,24 +175,14 @@ def exibir_visao_saida(df: pd.DataFrame):
         )
 
     with c4:
-        if "Recepção" in df.columns and not df["Recepção"].dropna().empty:
-            data_maxima = df["Recepção"].max().strftime("%d/%m")
-            df_hoje = df[df["Recepção"].dt.date == df["Recepção"].max().date()]
-            total_hoje = calcular_total_notas_unicas(df_hoje)
-        else:
-            data_maxima = "Hoje"
-            total_hoje = 0
-
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Entradas em {data_maxima}</div>
+                <div class='kpi-title'>Entradas em {data_hoje_str}</div>
                 <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{total_hoje:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
-
-    st.write("")
 
     # --- 4. VISUALIZAÇÃO OPERACIONAL ---
     col_grafico, col_tabela = st.columns([1.2, 0.8])
@@ -180,7 +193,6 @@ def exibir_visao_saida(df: pd.DataFrame):
         df_tendencia = obter_evolucao_diaria_mes_atual(df, coluna_data="Recepção")
         
         if not df_tendencia.empty:
-            # Gráfico Plotly customizado: Datas na horizontal + Números no topo dos pontos
             fig = px.line(
                 df_tendencia, 
                 x="Dia", 
@@ -198,10 +210,10 @@ def exibir_visao_saida(df: pd.DataFrame):
             fig.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=25, b=10),
+                margin=dict(l=10, r=10, t=20, b=10),
                 xaxis=dict(
                     type="category", 
-                    tickangle=0,  # Garante datas 100% HORIZONTAIS
+                    tickangle=0,
                     tickfont=dict(color=COLOR_TEXT_MUTED, size=11),
                     gridcolor="#1F332E"
                 ),
@@ -210,25 +222,22 @@ def exibir_visao_saida(df: pd.DataFrame):
                     gridcolor="#1F332E",
                     tickfont=dict(color=COLOR_TEXT_MUTED)
                 ),
-                height=323
+                height=380
             )
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
         else:
             st.info("Sem dados de datas válidos para o gráfico de tendência.")
 
     with col_tabela:
         st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🎯 Status da Operação (Mês Atual)</h4>", unsafe_allow_html=True)
         
-        status_ignorados = ["REJEITADA", "CANCELADA"]
-        df_status_operacional = df_status_mes[~df_status_mes["Status"].isin(status_ignorados)] if not df_status_mes.empty else pd.DataFrame()
-
+        # Exibe todos os status do mês (incluindo Canceladas e Rejeitadas)
         st.dataframe(
-            df_status_operacional.style.format({
+            df_status_mes.style.format({
                 "Qtd_NFs": "{:,.0f}",
                 "% Representatividade": "{:.1f}%"
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
-            height=280
-            )
-        
+            height=320
+        )
