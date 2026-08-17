@@ -83,3 +83,93 @@ def obter_evolucao_diaria_mes_atual(df: pd.DataFrame, coluna_data: str = "Recep�
 
     evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d/%m")
     return evolucao[["Dia", "Qtd_NFs"]]
+
+def calcular_total_volumes(df: pd.DataFrame, coluna_vol: str = "Qtde de Volumes") -> int:
+    """Calcula o total acumulado de volumes."""
+    if df.empty or coluna_vol not in df.columns:
+        return 0
+    return int(pd.to_numeric(df[coluna_vol], errors="coerce").fillna(0).sum())
+
+
+def obter_evolucao_diaria_volumes_mes_atual(
+    df: pd.DataFrame, 
+    coluna_data: str = "Recepção", 
+    coluna_vol: str = "Qtde de Volumes"
+) -> pd.DataFrame:
+    """Calcula a soma diária de volumes para o mês mais recente."""
+    if df.empty or coluna_data not in df.columns or coluna_vol not in df.columns:
+        return pd.DataFrame()
+
+    df_data = df.copy()
+    df_data[coluna_data] = pd.to_datetime(df_data[coluna_data], errors="coerce")
+    df_data[coluna_vol] = pd.to_numeric(df_data[coluna_vol], errors="coerce").fillna(0)
+    df_data = df_data.dropna(subset=[coluna_data])
+
+    if df_data.empty:
+        return pd.DataFrame()
+
+    data_maxima = df_data[coluna_data].max()
+    df_mes = df_data[
+        (df_data[coluna_data].dt.year == data_maxima.year) & 
+        (df_data[coluna_data].dt.month == data_maxima.month)
+    ]
+
+    evolucao = (
+        df_mes.groupby(df_mes[coluna_data].dt.date)[coluna_vol]
+        .sum()
+        .reset_index()
+        .rename(columns={coluna_data: "Data", coluna_vol: "Qtd_Volumes"})
+    )
+
+    evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d/%m")
+    evolucao["Qtd_Volumes"] = evolucao["Qtd_Volumes"].astype(int)
+    
+    return evolucao[["Dia", "Qtd_Volumes"]]
+
+
+def obter_top_clientes_volumes_mes_atual(
+    df: pd.DataFrame, 
+    coluna_cliente: str = "Cliente", 
+    coluna_vol: str = "Qtde de Volumes", 
+    coluna_data: str = "Recepção", 
+    top_n: int = 6
+) -> pd.DataFrame:
+    """Agrupa por cliente no mês atual e resume os nomes longos."""
+    if df.empty or coluna_cliente not in df.columns or coluna_vol not in df.columns:
+        return pd.DataFrame()
+
+    df_mes = df.copy()
+    if coluna_data in df_mes.columns:
+        df_mes[coluna_data] = pd.to_datetime(df_mes[coluna_data], errors="coerce")
+        df_mes = df_mes.dropna(subset=[coluna_data])
+        if not df_mes.empty:
+            data_maxima = df_mes[coluna_data].max()
+            df_mes = df_mes[
+                (df_mes[coluna_data].dt.year == data_maxima.year) & 
+                (df_mes[coluna_data].dt.month == data_maxima.month)
+            ]
+
+    df_mes[coluna_vol] = pd.to_numeric(df_mes[coluna_vol], errors="coerce").fillna(0)
+
+    resumo = (
+        df_mes.groupby(coluna_cliente)[coluna_vol]
+        .sum()
+        .reset_index()
+        .rename(columns={coluna_cliente: "Cliente", coluna_vol: "Qtd_Volumes"})
+    )
+
+    resumo = resumo.sort_values(by="Qtd_Volumes", ascending=False).reset_index(drop=True)
+    resumo["Qtd_Volumes"] = resumo["Qtd_Volumes"].astype(int)
+
+    total_geral = resumo["Qtd_Volumes"].sum()
+    if total_geral > 0:
+        resumo["% Representatividade"] = (resumo["Qtd_Volumes"] / total_geral) * 100
+    else:
+        resumo["% Representatividade"] = 0
+
+    # Trunca nomes com mais de 25 caracteres para exibição
+    resumo["Cliente_Exibicao"] = resumo["Cliente"].apply(
+        lambda x: (str(x)[:22] + "...") if len(str(x)) > 25 else str(x)
+    )
+
+    return resumo.head(top_n)

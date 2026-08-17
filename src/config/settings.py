@@ -5,7 +5,7 @@ Centraliza a paleta de cores da LOGCARE, regras de layout e visualização da TV
 
 # Identidade do Produto
 BRAND_NAME = "LOGCARE LOGÍSTICA"
-APP_TITLE = "PAINEL OPERACIONAL - NOTAS RECEBIDAS"
+APP_TITLE = "Painel Operacional - Pedidos Diários"
 
 # Paleta Oficial LOGCARE & Ajustes de Alto Contraste para TV
 COLOR_BRAND_PRIMARY = "#00BBA9"    # Verde menta vibrante do logo (Destaque Principal)

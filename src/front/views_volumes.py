@@ -1,5 +1,5 @@
 """
-Módulo Frontend: Visão Operacional de Pedidos/Notas (Tela 1)
+Módulo Frontend: Visão Operacional de Volumes e Clientes (Tela 2)
 """
 
 import streamlit as st
@@ -12,10 +12,11 @@ from src.config.settings import (
     COLOR_TEXT_MUTED, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING
 )
 from src.core.metrics import (
-    calcular_total_notas_unicas, 
-    obter_resumo_por_status_mes_atual,
-    obter_evolucao_diaria_mes_atual
+    calcular_total_volumes,
+    obter_evolucao_diaria_volumes_mes_atual,
+    obter_top_clientes_volumes_mes_atual
 )
+
 
 def renderizar_css_tv():
     st.markdown(
@@ -67,7 +68,7 @@ def renderizar_css_tv():
     )
 
 
-def exibir_visao_saida(df: pd.DataFrame):
+def exibir_visao_volumes(df: pd.DataFrame):
     renderizar_css_tv()
 
     # --- 1. CABEÇALHO ---
@@ -81,7 +82,7 @@ def exibir_visao_saida(df: pd.DataFrame):
             st.markdown(f"<h2 style='color: {COLOR_BRAND_PRIMARY}; margin:0;'>LOGCARE</h2>", unsafe_allow_html=True)
             
     with c2:
-        st.markdown("<h2 class='header-title' style='padding-left: 15px;'>Painel Operacional - Status/Pedidos</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='header-title' style='padding-left: 15px;'>Painel Operacional - Volumes/Clientes</h2>", unsafe_allow_html=True)
 
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px; border-color: #223834;'>", unsafe_allow_html=True)
 
@@ -89,7 +90,7 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.warning("⚠️ Nenhum dado operacional encontrado.")
         return
 
-    # --- 2. FILTRO GLOBAL DO MÊS ATUAL & CÁLCULOS ---
+    # --- 2. CÁLCULO DAS MÉTRICAS DO MÊS ATUAL ---
     if "Recepção" in df.columns:
         df_temp = df.copy()
         df_temp["Recepção"] = pd.to_datetime(df_temp["Recepção"], errors="coerce")
@@ -104,32 +105,31 @@ def exibir_visao_saida(df: pd.DataFrame):
             
             df_mes = df_temp[(df_temp["Recepção"].dt.year == ano_atual) & (df_temp["Recepção"].dt.month == mes_atual)]
             df_hoje = df_mes[df_mes["Recepção"].dt.date == data_maxima.date()]
-            total_hoje = calcular_total_notas_unicas(df_hoje)
+            total_volumes_hoje = calcular_total_volumes(df_hoje)
         else:
             df_mes = pd.DataFrame()
             nome_mes_ano = "Mês Atual"
             data_hoje_str = "Hoje"
-            total_hoje = 0
+            total_volumes_hoje = 0
     else:
         df_mes = df.copy()
         nome_mes_ano = "Mês Atual"
         data_hoje_str = "Hoje"
-        total_hoje = 0
+        total_volumes_hoje = 0
 
-    total_nfs_mes = calcular_total_notas_unicas(df_mes)
-    df_status_mes = obter_resumo_por_status_mes_atual(df, coluna_data="Recepção")
+    total_volumes_mes = calcular_total_volumes(df_mes)
 
-    # Expedidas no Mês
+    # Volumes Expedidos
     df_expedidas_mes = df_mes[df_mes["Status"] == "EXPEDIDO"] if "Status" in df_mes.columns else pd.DataFrame()
-    total_expedidas_mes = calcular_total_notas_unicas(df_expedidas_mes)
+    total_volumes_expedidos = calcular_total_volumes(df_expedidas_mes)
 
-    # Pendências Operacionais
+    # Volumes com Pendência
     status_finalizados = ["EXPEDIDO", "CANCELADA", "REJEITADA", "CANCELADO", "REJEITADO"]
     if "Status" in df_mes.columns:
         df_pendentes_mes = df_mes[~df_mes["Status"].astype(str).str.strip().str.upper().isin(status_finalizados)]
-        total_pendentes = calcular_total_notas_unicas(df_pendentes_mes)
+        total_volumes_pendentes = calcular_total_volumes(df_pendentes_mes)
     else:
-        total_pendentes = 0
+        total_volumes_pendentes = 0
 
     # --- 3. LINHA DE CARDS ---
     c1, c2, c3, c4 = st.columns(4)
@@ -138,8 +138,8 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Total Pedidos ({nome_mes_ano})</div>
-                <div class='kpi-value' style='color: {COLOR_BRAND_PRIMARY};'>{total_nfs_mes:,}</div>
+                <div class='kpi-title'>Total Volumes ({nome_mes_ano})</div>
+                <div class='kpi-value' style='color: {COLOR_BRAND_PRIMARY};'>{total_volumes_mes:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
@@ -148,19 +148,19 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Expedidos no Mês</div>
-                <div class='kpi-value' style='color: {COLOR_SUCCESS};'>{total_expedidas_mes:,}</div>
+                <div class='kpi-title'>Volumes Expedidos</div>
+                <div class='kpi-value' style='color: {COLOR_SUCCESS};'>{total_volumes_expedidos:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
 
     with c3:
-        cor_pendencia = COLOR_DANGER if total_pendentes > 50 else COLOR_WARNING
+        cor_pendencia = COLOR_DANGER if total_volumes_pendentes > 500 else COLOR_WARNING
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Pendências Operacionais</div>
-                <div class='kpi-value' style='color: {cor_pendencia};'>{total_pendentes:,}</div>
+                <div class='kpi-title'>Volumes Pendentes</div>
+                <div class='kpi-value' style='color: {cor_pendencia};'>{total_volumes_pendentes:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
@@ -169,8 +169,8 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Recebidos em {data_hoje_str}</div>
-                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{total_hoje:,}</div>
+                <div class='kpi-title'>Volumes em {data_hoje_str}</div>
+                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{total_volumes_hoje:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
@@ -178,19 +178,19 @@ def exibir_visao_saida(df: pd.DataFrame):
     st.write("")
 
     # --- 4. VISUALIZAÇÃO OPERACIONAL ---
-    col_grafico, col_tabela = st.columns([1.1, 0.9])
+    col_grafico, col_clientes = st.columns([1.1, 0.9])
 
     with col_grafico:
-        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>📈 Ritmo Diário de Entradas (Mês Atual)</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>📈 Ritmo Diário de Volumes (Mês Atual)</h4>", unsafe_allow_html=True)
         
-        df_tendencia = obter_evolucao_diaria_mes_atual(df, coluna_data="Recepção")
+        df_tendencia_vol = obter_evolucao_diaria_volumes_mes_atual(df)
         
-        if not df_tendencia.empty:
+        if not df_tendencia_vol.empty:
             fig = px.line(
-                df_tendencia, 
+                df_tendencia_vol, 
                 x="Dia", 
-                y="Qtd_NFs", 
-                text="Qtd_NFs",
+                y="Qtd_Volumes", 
+                text="Qtd_Volumes",
                 markers=True
             )
             fig.update_traces(
@@ -219,15 +219,20 @@ def exibir_visao_saida(df: pd.DataFrame):
             )
             st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
         else:
-            st.info("Sem dados de datas válidos para o gráfico de tendência.")
+            st.info("Sem dados de volumes válidos para o gráfico de tendência.")
 
-    with col_tabela:
-        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🎯 Status da Operação (Mês Atual)</h4>", unsafe_allow_html=True)
+    with col_clientes:
+        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🏢 Top Clientes por Volume (Mês Atual)</h4>", unsafe_allow_html=True)
         
-        if not df_status_mes.empty:
+        df_top_clientes = obter_top_clientes_volumes_mes_atual(df, top_n=6)
+
+        if not df_top_clientes.empty:
+            # Apresentação via Tabela com colunas limpas (sem cortar nem espremer)
             st.dataframe(
-                df_status_mes.style.format({
-                    "Qtd_NFs": "{:,.0f}",
+                df_top_clientes[["Cliente_Exibicao", "Qtd_Volumes", "% Representatividade"]].rename(
+                    columns={"Cliente_Exibicao": "Cliente"}
+                ).style.format({
+                    "Qtd_Volumes": "{:,.0f}",
                     "% Representatividade": "{:.1f}%"
                 }),
                 width='stretch',
@@ -235,4 +240,4 @@ def exibir_visao_saida(df: pd.DataFrame):
                 height=320
             )
         else:
-            st.info("Sem dados de status disponíveis.")
+            st.info("Sem dados de clientes disponíveis.")

@@ -12,7 +12,7 @@ from src.config.settings import DEFAULT_OPERATIONAL_YEAR
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PASTA_STATUS_SAIDA = BASE_DIR / "data" / "status_saida"
 
-# @st.cache_data guarda os 280 mil dados na memória RAM para a tela carregar instantaneamente!
+# @st.cache_data guarda os dados na memória RAM para a tela carregar instantaneamente!
 @st.cache_data(ttl=300)  # Revalida o cache a cada 5 minutos
 def carregar_dados_status_saida(pasta_dados: Path = PASTA_STATUS_SAIDA) -> pd.DataFrame:
     pasta = Path(pasta_dados)
