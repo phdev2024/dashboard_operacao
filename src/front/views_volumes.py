@@ -232,8 +232,8 @@ def exibir_visao_volumes(df: pd.DataFrame):
                 df_top_clientes[["Cliente_Exibicao", "Qtd_Volumes", "% Representatividade"]].rename(
                     columns={"Cliente_Exibicao": "Cliente"}
                 ).style.format({
-                    "Qtd_Volumes": "{:,.0f}",
-                    "% Representatividade": "{:.1f}%"
+                    "Qtd_Volumes": lambda x: f"{x:,.0f}".replace(",", "."),
+                    "% Representatividade": lambda x: f"{x:.1f}%".replace(",", ".")
                 }),
                 width='stretch',
                 hide_index=True,

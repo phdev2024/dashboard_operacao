@@ -173,3 +173,60 @@ def obter_top_clientes_volumes_mes_atual(
     )
 
     return resumo.head(top_n)
+
+def calcular_tempo_medio_processamento_mes_atual(
+    df: pd.DataFrame,
+    coluna_inicio: str = "Recepção",
+    coluna_fim: str = "Conferência Fim"
+) -> str:
+    """
+    Calcula o Lead Time médio interno para pedidos concluídos no mesmo dia
+    (eliminando distorções de noites, finais de semana e pedidos represados).
+    """
+    if df.empty or coluna_inicio not in df.columns or coluna_fim not in df.columns:
+        return "--"
+
+    df_temp = df.copy()
+    
+    # 1. Converte para datetime garantindo leitura correta no formato DD/MM/AAAA
+    df_temp[coluna_inicio] = pd.to_datetime(df_temp[coluna_inicio], errors="coerce", dayfirst=True)
+    df_temp[coluna_fim] = pd.to_datetime(df_temp[coluna_fim], errors="coerce", dayfirst=True)
+    
+    # 2. Filtra registros válidos com início e fim preenchidos
+    df_temp = df_temp.dropna(subset=[coluna_inicio, coluna_fim])
+    
+    if df_temp.empty:
+        return "--"
+
+    # 3. Filtra apenas o mês mais recente
+    data_maxima = df_temp[coluna_inicio].max()
+    df_mes = df_temp[
+        (df_temp[coluna_inicio].dt.year == data_maxima.year) & 
+        (df_temp[coluna_inicio].dt.month == data_maxima.month)
+    ].copy()
+
+    if df_mes.empty:
+        return "--"
+
+    # 4. Regra da Opção B: Apenas pedidos recebidos e finalizados no MESMO DIA
+    df_mes = df_mes[df_mes[coluna_inicio].dt.date == df_mes[coluna_fim].dt.date]
+
+    if df_mes.empty:
+        return "--"
+
+    # 5. Calcula a diferença em minutos
+    df_mes["Diferenca_Minutos"] = (df_mes[coluna_fim] - df_mes[coluna_inicio]).dt.total_seconds() / 60
+
+    # 6. Filtra diferenças coerentes (maior que zero e menor que 24 horas no mesmo dia)
+    df_validos = df_mes[(df_mes["Diferenca_Minutos"] > 0) & (df_mes["Diferenca_Minutos"] <= 1440)]
+
+    if df_validos.empty:
+        return "--"
+
+    media_minutos = df_validos["Diferenca_Minutos"].mean()
+
+    # 7. Formata como '00h 00m'
+    horas = int(media_minutos // 60)
+    minutos = int(media_minutos % 60)
+
+    return f"{horas:02d}h {minutos:02d}m"

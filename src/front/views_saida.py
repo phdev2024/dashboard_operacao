@@ -14,7 +14,8 @@ from src.config.settings import (
 from src.core.metrics import (
     calcular_total_notas_unicas, 
     obter_resumo_por_status_mes_atual,
-    obter_evolucao_diaria_mes_atual
+    obter_evolucao_diaria_mes_atual,
+    calcular_tempo_medio_processamento_mes_atual
 )
 
 def renderizar_css_tv():
@@ -131,6 +132,13 @@ def exibir_visao_saida(df: pd.DataFrame):
     else:
         total_pendentes = 0
 
+# Lead Time Médio Interno (Recepção até Fim da Conferência)
+    tempo_medio_str = calcular_tempo_medio_processamento_mes_atual(
+        df_mes, 
+        coluna_inicio="Recepção", 
+        coluna_fim="Conferência Fim"
+    )
+
     # --- 3. LINHA DE CARDS ---
     c1, c2, c3, c4 = st.columns(4)
 
@@ -169,10 +177,10 @@ def exibir_visao_saida(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Recebidos em {data_hoje_str}</div>
-                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{total_hoje:,}</div>
+                <div class='kpi-title'>Tempo Médio Ciclo</div>
+                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{tempo_medio_str}</div>
             </div>
-            """.replace(",", "."), unsafe_allow_html=True
+            """, unsafe_allow_html=True
         )
 
     st.write("")
@@ -181,7 +189,7 @@ def exibir_visao_saida(df: pd.DataFrame):
     col_grafico, col_tabela = st.columns([1.1, 0.9])
 
     with col_grafico:
-        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>📈 Ritmo Diário de Entradas (Mês Atual)</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>📈 Ritmo Diário de Pedidos (Mês Atual)</h4>", unsafe_allow_html=True)
         
         df_tendencia = obter_evolucao_diaria_mes_atual(df, coluna_data="Recepção")
         
