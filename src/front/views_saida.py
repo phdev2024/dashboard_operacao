@@ -235,7 +235,7 @@ def exibir_visao_saida(df: pd.DataFrame):
         if not df_status_mes.empty:
             st.dataframe(
                 df_status_mes.style.format({
-                    "Qtd_NFs": "{:,.0f}",
+                    "Qtd_NFs": lambda x: f"{x:,.0f}".replace(",", "."),
                     "% Representatividade": "{:.1f}%"
                 }),
                 width='stretch',
