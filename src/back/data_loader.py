@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PASTA_STATUS_SAIDA = BASE_DIR / "data" / "status_saida"
 
 # @st.cache_data guarda os dados na memória RAM para a tela carregar instantaneamente!
-@st.cache_data(ttl=300)  # Revalida o cache a cada 5 minutos
+# @st.cache_data(ttl=300)  # Revalida o cache a cada 5 minutos
 def carregar_dados_status_saida(pasta_dados: Path = PASTA_STATUS_SAIDA) -> pd.DataFrame:
     pasta = Path(pasta_dados)
     arquivos = list(pasta.glob("*.xlsx")) + list(pasta.glob("*.xls")) + list(pasta.glob("*.csv"))
