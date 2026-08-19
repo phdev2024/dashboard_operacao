@@ -3,6 +3,22 @@ Módulo de Configurações Globais da Aplicação (Settings)
 Centraliza a paleta de cores da LOGCARE, regras de layout e visualização da TV.
 """
 
+"""
+Módulo de Configurações Globais da Aplicação (Settings)
+"""
+
+from pathlib import Path
+
+# --- DIRETÓRIOS BASE DO PROJETO ---
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = BASE_DIR / "data"
+
+# Pastas de dados operacionais
+PASTA_STATUS_SAIDA = DATA_DIR / "saida"
+PASTA_ENTRADA = DATA_DIR / "entrada"
+PASTA_TRANSPORTE = DATA_DIR / "transporte"
+
+
 # Identidade do Produto
 BRAND_NAME = "LOGCARE LOGÍSTICA"
 APP_TITLE = "Painel Operacional - Pedidos Diários"
