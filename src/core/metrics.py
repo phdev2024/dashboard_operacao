@@ -81,7 +81,7 @@ def obter_evolucao_diaria_mes_atual(df: pd.DataFrame, coluna_data: str = "RecepÃ
         .rename(columns={coluna_data: "Data", coluna_nf: "Qtd_NFs"})
     )
 
-    evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d/%m")
+    evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d")
     return evolucao[["Dia", "Qtd_NFs"]]
 
 def calcular_total_volumes(df: pd.DataFrame, coluna_vol: str = "Qtde de Volumes") -> int:
@@ -121,7 +121,7 @@ def obter_evolucao_diaria_volumes_mes_atual(
         .rename(columns={coluna_data: "Data", coluna_vol: "Qtd_Volumes"})
     )
 
-    evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d/%m")
+    evolucao["Dia"] = pd.to_datetime(evolucao["Data"]).dt.strftime("%d")
     evolucao["Qtd_Volumes"] = evolucao["Qtd_Volumes"].astype(int)
     
     return evolucao[["Dia", "Qtd_Volumes"]]
