@@ -56,6 +56,11 @@ def renderizar_css_tv():
                 font-weight: 800;
                 line-height: 1.1;
             }}
+            .kpi-subtext {{
+                font-size: 0.75rem;
+                color: #8DAA9D;
+                margin-top: 4px;
+            }}
             .header-title {{
                 color: #FFFFFF;
                 font-size: 1.8rem;
@@ -119,6 +124,11 @@ def exibir_visao_volumes(df: pd.DataFrame):
 
     total_volumes_mes = calcular_total_volumes(df_mes)
 
+    # Cálculo da Média Diária de Volumes
+    dias_operados = df_mes["Recepção"].dt.date.nunique() if (not df_mes.empty and "Recepção" in df_mes.columns) else 1
+    dias_operados = max(dias_operados, 1)
+    media_volumes_dia = int(total_volumes_mes / dias_operados)
+
     # Volumes Expedidos
     df_expedidas_mes = df_mes[df_mes["Status"] == "EXPEDIDO"] if "Status" in df_mes.columns else pd.DataFrame()
     total_volumes_expedidos = calcular_total_volumes(df_expedidas_mes)
@@ -131,7 +141,7 @@ def exibir_visao_volumes(df: pd.DataFrame):
     else:
         total_volumes_pendentes = 0
 
-    # --- 3. LINHA DE CARDS ---
+   # --- 3. LINHA DE CARDS ---
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -169,13 +179,12 @@ def exibir_visao_volumes(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Volumes em {data_hoje_str}</div>
-                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{total_volumes_hoje:,}</div>
+                <div class='kpi-title'>Média Diária ({nome_mes_ano})</div>
+                <div class='kpi-value' style='color: {COLOR_TEXT_LIGHT};'>{media_volumes_dia:,}</div>
+                
             </div>
             """.replace(",", "."), unsafe_allow_html=True
         )
-
-    st.write("")
 
     # --- 4. VISUALIZAÇÃO OPERACIONAL ---
     col_grafico, col_clientes = st.columns([1.1, 0.9])
@@ -227,7 +236,6 @@ def exibir_visao_volumes(df: pd.DataFrame):
         df_top_clientes = obter_top_clientes_volumes_mes_atual(df, top_n=6)
 
         if not df_top_clientes.empty:
-            # Apresentação via Tabela com colunas limpas (sem cortar nem espremer)
             st.dataframe(
                 df_top_clientes[["Cliente_Exibicao", "Qtd_Volumes", "% Representatividade"]].rename(
                     columns={"Cliente_Exibicao": "Cliente"}

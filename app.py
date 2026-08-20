@@ -1,11 +1,18 @@
 """
 Ponto de Entrada Principal (Main Application)
-Painel Operacional Logcare com Suporte a Carrossel de TV
+Painel Operacional Logcare com Suporte a Carrossel de TV e Upload Inteligente
 """
 
 import streamlit as st
 import time
-from src.config.settings import APP_TITLE, BRAND_NAME
+from pathlib import Path
+
+from src.config.settings import (
+    APP_TITLE,
+    BRAND_NAME,
+    PASTA_OPERACIONAL_SAIDA,
+    PASTA_STATUS_SAIDA
+)
 from src.back.data_loader import carregar_dados_status_saida as carregar_dados_saida
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
@@ -25,10 +32,10 @@ if "tela_ativa" not in st.session_state:
 if "modo_tv" not in st.session_state:
     st.session_state.modo_tv = False
 
-# Carrega a base tratada com cache
+# Carrega a base operacional rápida (mês atual)
 df_operacao = carregar_dados_saida()
 
-# --- BARRA LATERAL: CONTROLES DE NAVEGAÇÃO ---
+# --- BARRA LATERAL: CONTROLES DE NAVEGAÇÃO & UPLOAD ---
 with st.sidebar:
     st.title("⚙️ Painel de Controle")
     st.session_state.modo_tv = st.toggle("Modo Carrossel TV (Auto-Troca)", value=st.session_state.modo_tv)
@@ -44,6 +51,41 @@ with st.sidebar:
     
     if not st.session_state.modo_tv:
         st.session_state.tela_ativa = "Notas" if escolha_manual == "Notas Recebidas" else "Volumes"
+
+    st.markdown("---")
+    
+    # --- ÁREA DE UPLOAD OPERACIONAL ---
+    with st.expander("📤 Atualizar Dados Operacionais", expanded=False):
+        st.caption("Envie o relatório do mês atual (.xlsx)")
+        arquivo_enviado = st.file_uploader(
+            "Selecione a planilha",
+            type=["xlsx"],
+            accept_multiple_files=False,
+            label_visibility="collapsed"
+        )
+        
+        if arquivo_enviado is not None:
+            if st.button("💾 Salvar e Atualizar TV", use_container_width=True):
+                # 1. Garante que a pasta operacional exista
+                PASTA_OPERACIONAL_SAIDA.mkdir(parents=True, exist_ok=True)
+                
+                # 2. Limpa arquivos antigos da pasta operacional para manter apenas o atual
+                for arquivo_antigo in PASTA_OPERACIONAL_SAIDA.glob("*.*"):
+                    try:
+                        arquivo_antigo.unlink()
+                    except Exception:
+                        pass
+
+                # 3. Grava o novo arquivo do mês
+                caminho_destino = PASTA_OPERACIONAL_SAIDA / arquivo_enviado.name
+                with open(caminho_destino, "wb") as f:
+                    f.write(arquivo_enviado.getbuffer())
+                
+                # 4. Limpa a memória de cache e recarrega na hora
+                st.cache_data.clear()
+                st.success(f"Base operacional atualizada com '{arquivo_enviado.name}'!")
+                time.sleep(1)
+                st.rerun()
 
 # --- RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":

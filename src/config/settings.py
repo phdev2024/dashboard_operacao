@@ -1,10 +1,5 @@
 """
 Módulo de Configurações Globais da Aplicação (Settings)
-Centraliza a paleta de cores da LOGCARE, regras de layout e visualização da TV.
-"""
-
-"""
-Módulo de Configurações Globais da Aplicação (Settings)
 """
 
 from pathlib import Path
@@ -13,42 +8,39 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-# Pastas de dados operacionais
-PASTA_STATUS_SAIDA = DATA_DIR / "saida"
+# Pastas Oficiais de Saída
+PASTA_STATUS_SAIDA = DATA_DIR / "status_saida"
+PASTA_OPERACIONAL_SAIDA = PASTA_STATUS_SAIDA / "operacional"
+PASTA_HISTORICO_SAIDA = PASTA_STATUS_SAIDA / "historico"
+
+# Outras operações
 PASTA_ENTRADA = DATA_DIR / "entrada"
 PASTA_TRANSPORTE = DATA_DIR / "transporte"
 
-
-# Identidade do Produto
+# Identidade Visual e Layout
 BRAND_NAME = "LOGCARE LOGÍSTICA"
 APP_TITLE = "Painel Operacional - Pedidos Diários"
 
-# Paleta Oficial LOGCARE & Ajustes de Alto Contraste para TV
-COLOR_BRAND_PRIMARY = "#00BBA9"    # Verde menta vibrante do logo (Destaque Principal)
-COLOR_BRAND_SECONDARY = "#069782"  # Verde turquesa intermediário
-COLOR_BRAND_DARK = "#2D655A"       # Verde escuro institucional
+COLOR_BRAND_PRIMARY = "#00BBA9"
+COLOR_BRAND_SECONDARY = "#069782"
+COLOR_BRAND_DARK = "#2D655A"
 
-# Estrutura Dark Mode para Leitura de Longe
-COLOR_BG_DARK = "#0B1311"          # Fundo escuro levemente esverdeado
-COLOR_CARD_BG = "#162421"          # Fundo dos cards operacionais
-COLOR_CARD_BORDER = "#223834"      # Borda sutil dos cards
+COLOR_BG_DARK = "#0B1311"
+COLOR_CARD_BG = "#162421"
+COLOR_CARD_BORDER = "#223834"
 
-# Indicadores de Status Operacional
-COLOR_SUCCESS = "#00E676"          # Verde Neon (Concluído/OK)
-COLOR_WARNING = "#FFD600"          # Amarelo (Em Separação/Atenção)
-COLOR_DANGER = "#FF1744"           # Vermelho Alerta (Atrasado/Pendente)
+COLOR_SUCCESS = "#00E676"
+COLOR_WARNING = "#FFD600"
+COLOR_DANGER = "#FF1744"
 
-# Tipografia
-COLOR_TEXT_LIGHT = "#FFFFFF"       # Texto principal
-COLOR_TEXT_MUTED = "#8DAA9D"       # Texto secundário / rótulos
+COLOR_TEXT_LIGHT = "#FFFFFF"
+COLOR_TEXT_MUTED = "#8DAA9D"
 
-# Configurações do Streamlit
 PAGE_CONFIG = {
     "page_title": "Logcare - Painel Operacional",
     "page_icon": "🦅",
     "layout": "wide",
-    "initial_sidebar_state": "collapsed"
+    "initial_sidebar_state": "expanded"
 }
 
-# Filtro Padrão da Operação
 DEFAULT_OPERATIONAL_YEAR = 2026

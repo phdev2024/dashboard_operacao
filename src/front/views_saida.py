@@ -163,7 +163,7 @@ def exibir_visao_saida(df: pd.DataFrame):
         )
 
     with c3:
-        cor_pendencia = COLOR_DANGER if total_pendentes > 50 else COLOR_WARNING
+        cor_pendencia = COLOR_DANGER if total_pendentes > 80 else COLOR_WARNING
         st.markdown(
             f"""
             <div class='kpi-card'>

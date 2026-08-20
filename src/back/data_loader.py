@@ -1,22 +1,30 @@
 """
-Módulo Backend: Data Loader
-Responsável por varrer a pasta de arquivos, ler os formatos (Excel/CSV)
-e entregar um DataFrame unificado e higienizado.
+Módulo Backend: Carregamento de Dados Operacionais e Históricos
 """
 
 import streamlit as st
-from pathlib import Path
 import pandas as pd
-from src.config.settings import DEFAULT_OPERATIONAL_YEAR
+from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-PASTA_STATUS_SAIDA = BASE_DIR / "data" / "status_saida"
+from src.config.settings import (
+    PASTA_OPERACIONAL_SAIDA,
+    PASTA_HISTORICO_SAIDA,
+    PASTA_STATUS_SAIDA
+)
 
-# @st.cache_data guarda os dados na memória RAM para a tela carregar instantaneamente!
-@st.cache_data(ttl=900)  # Revalida o cache a cada 1git5 minutos
-def carregar_dados_status_saida(pasta_dados: Path = PASTA_STATUS_SAIDA) -> pd.DataFrame:
-    pasta = Path(pasta_dados)
-    arquivos = list(pasta.glob("*.xlsx")) + list(pasta.glob("*.xls")) + list(pasta.glob("*.csv"))
+
+def _ler_pasta_arquivos(pasta: Path) -> pd.DataFrame:
+    """Lê e consolida os arquivos Excel/CSV iniciando na linha padrão (header=4)."""
+    pasta_alvo = Path(pasta)
+    if not pasta_alvo.exists():
+        return pd.DataFrame()
+
+    arquivos = (
+        list(pasta_alvo.glob("*.xlsx")) +
+        list(pasta_alvo.glob("*.xls")) +
+        list(pasta_alvo.glob("*.csv"))
+    )
+    arquivos = [arq for arq in arquivos if not arq.name.startswith("~$")]
 
     if not arquivos:
         return pd.DataFrame()
@@ -24,51 +32,51 @@ def carregar_dados_status_saida(pasta_dados: Path = PASTA_STATUS_SAIDA) -> pd.Da
     lista_dfs = []
     for arquivo in arquivos:
         try:
-            if arquivo.suffix.lower() in ['.xlsx', '.xls']:
-                df_temp = pd.read_excel(arquivo, header=4)
+            if arquivo.suffix.lower() == ".csv":
+                df_temp = pd.read_csv(arquivo, sep=None, engine="python", encoding="latin1", header=4)
             else:
-                df_temp = pd.read_csv(arquivo, sep=None, engine='python', header=4)
-            
-            df_temp['arquivo_origem'] = arquivo.name
-            lista_dfs.append(df_temp)
-        except Exception as e:
-            print(f"❌ Erro ao ler {arquivo.name}: {e}")
+                # Linha 5 do Excel = índice 4 no Pandas
+                df_temp = pd.read_excel(arquivo, header=4)
+
+            if not df_temp.empty:
+                lista_dfs.append(df_temp)
+        except Exception:
+            continue
 
     if not lista_dfs:
         return pd.DataFrame()
 
     df_consolidado = pd.concat(lista_dfs, ignore_index=True)
-    df_consolidado.dropna(how='all', inplace=True)
-    
+
+    # Limpeza de espaços nos nomes das colunas
+    df_consolidado.columns = [str(c).strip() for c in df_consolidado.columns]
+
+    if "Recepção" in df_consolidado.columns:
+        df_consolidado["Recepção"] = pd.to_datetime(
+            df_consolidado["Recepção"], errors="coerce", dayfirst=True
+        )
+        df_consolidado = df_consolidado.sort_values(by="Recepção", ascending=True).reset_index(drop=True)
+
     return df_consolidado
-    
-    # Remove linhas totalmente vazias ou cabeçalhos repetidos que possam ter ficado no meio
-    df_consolidado.dropna(how='all', inplace=True)
-    
-    return df_consolidado
 
 
-def filtrar_dados_operacao(df: pd.DataFrame, coluna_data: str = None) -> pd.DataFrame:
+@st.cache_data(ttl=900)
+def carregar_dados_status_saida(pasta_dados: Path = None) -> pd.DataFrame:
     """
-    Aplica as regras de negócio para a tela da TV da Operação:
-    - Filtra dados mantendo apenas o escopo operacional do ano corrente (2026).
+    Lê a base operacional do mês atual dentro de data/status_saida/operacional/
     """
-    if df.empty:
-        return df
-        
-    df_filtrado = df.copy()
+    if pasta_dados is not None:
+        return _ler_pasta_arquivos(pasta_dados)
 
-    if coluna_data and coluna_data in df_filtrado.columns:
-        df_filtrado[coluna_data] = pd.to_datetime(df_filtrado[coluna_data], errors='coerce')
-        df_filtrado = df_filtrado[df_filtrado[coluna_data].dt.year == DEFAULT_OPERATIONAL_YEAR]
+    if PASTA_OPERACIONAL_SAIDA.exists() and any(PASTA_OPERACIONAL_SAIDA.iterdir()):
+        return _ler_pasta_arquivos(PASTA_OPERACIONAL_SAIDA)
 
-    return df_filtrado
+    return _ler_pasta_arquivos(PASTA_STATUS_SAIDA)
 
 
-if __name__ == "__main__":
-    df_teste = carregar_dados_status_saida()
-    print(f"✅ Total de linhas carregadas: {len(df_teste)}")
-    if not df_teste.empty:
-        print("📌 Nomes reais das colunas encontradas:")
-        for col in df_teste.columns.tolist()[:10]:
-            print(f"   - {col}")
+@st.cache_data(ttl=1800)
+def carregar_dados_historicos_saida() -> pd.DataFrame:
+    """
+    Lê todo o histórico acumulado dentro de data/status_saida/historico/
+    """
+    return _ler_pasta_arquivos(PASTA_HISTORICO_SAIDA)
