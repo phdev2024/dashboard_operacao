@@ -1,6 +1,6 @@
 """
 Ponto de Entrada Principal (Main Application)
-Painel Operacional Logcare com Suporte a Carrossel de TV e Upload Inteligente
+Painel Operacional Logcare com Suporte a Carrossel de TV, Coletas e Upload Inteligente
 """
 
 import streamlit as st
@@ -14,8 +14,10 @@ from src.config.settings import (
     PASTA_STATUS_SAIDA
 )
 from src.back.data_loader import carregar_dados_status_saida as carregar_dados_saida
+from src.back.coletas import carregar_coletas_pendentes
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
+from src.front.views_coletas import exibir_visao_coletas
 
 # Configuração da página
 st.set_page_config(
@@ -32,8 +34,9 @@ if "tela_ativa" not in st.session_state:
 if "modo_tv" not in st.session_state:
     st.session_state.modo_tv = False
 
-# Carrega a base operacional rápida (mês atual)
+# Carrega a base operacional rápida (mês atual) e a fila de coletas pendentes
 df_operacao = carregar_dados_saida()
+df_coletas = carregar_coletas_pendentes()
 
 # --- BARRA LATERAL: CONTROLES DE NAVEGAÇÃO & UPLOAD ---
 with st.sidebar:
@@ -43,14 +46,24 @@ with st.sidebar:
     tempo_troca = st.slider("Tempo de transição (segundos)", min_value=10, max_value=120, value=30, step=5)
     
     st.markdown("---")
+    
+    # Mapeamento amigável para o seletor manual
+    opcoes_telas = {
+        "Notas": "Notas Recebidas",
+        "Volumes": "Volumes & Clientes",
+        "Coletas": "Programação de Coletas"
+    }
+    opcoes_invertidas = {v: k for k, v in opcoes_telas.items()}
+
     escolha_manual = st.radio(
         "Selecione a Visão:",
-        ["Notas Recebidas", "Volumes & Clientes"],
-        index=0 if st.session_state.tela_ativa == "Notas" else 1
+        list(opcoes_telas.values()),
+        index=list(opcoes_telas.keys()).index(st.session_state.tela_ativa)
     )
     
+    # Se o modo TV estiver desligado, obedece à escolha manual do operador
     if not st.session_state.modo_tv:
-        st.session_state.tela_ativa = "Notas" if escolha_manual == "Notas Recebidas" else "Volumes"
+        st.session_state.tela_ativa = opcoes_invertidas[escolha_manual]
 
     st.markdown("---")
     
@@ -66,22 +79,18 @@ with st.sidebar:
         
         if arquivo_enviado is not None:
             if st.button("💾 Salvar e Atualizar TV", use_container_width=True):
-                # 1. Garante que a pasta operacional exista
                 PASTA_OPERACIONAL_SAIDA.mkdir(parents=True, exist_ok=True)
                 
-                # 2. Limpa arquivos antigos da pasta operacional para manter apenas o atual
                 for arquivo_antigo in PASTA_OPERACIONAL_SAIDA.glob("*.*"):
                     try:
                         arquivo_antigo.unlink()
                     except Exception:
                         pass
 
-                # 3. Grava o novo arquivo do mês
                 caminho_destino = PASTA_OPERACIONAL_SAIDA / arquivo_enviado.name
                 with open(caminho_destino, "wb") as f:
                     f.write(arquivo_enviado.getbuffer())
                 
-                # 4. Limpa a memória de cache e recarrega na hora
                 st.cache_data.clear()
                 st.success(f"Base operacional atualizada com '{arquivo_enviado.name}'!")
                 time.sleep(1)
@@ -90,12 +99,20 @@ with st.sidebar:
 # --- RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":
     exibir_visao_saida(df_operacao)
-else:
+elif st.session_state.tela_ativa == "Volumes":
     exibir_visao_volumes(df_operacao)
+elif st.session_state.tela_ativa == "Coletas":
+    exibir_visao_coletas(df_coletas)
 
-# --- MECANISMO DO CARROSSEL AUTOMÁTICO ---
+# --- MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
 if st.session_state.modo_tv:
     time.sleep(tempo_troca)
-    # Alterna entre as telas
-    st.session_state.tela_ativa = "Volumes" if st.session_state.tela_ativa == "Notas" else "Notas"
+    
+    # Ordem de transição da esteira: Notas -> Volumes -> Coletas -> Notas
+    proxima_tela = {
+        "Notas": "Volumes",
+        "Volumes": "Coletas",
+        "Coletas": "Notas"
+    }
+    st.session_state.tela_ativa = proxima_tela.get(st.session_state.tela_ativa, "Notas")
     st.rerun()
