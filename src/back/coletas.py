@@ -11,7 +11,7 @@ import re
 LINK_COMPARTILHADO = "https://docs.google.com/spreadsheets/d/1CSxm8VLmnpYJb32nqIehYbxaLJyJAvro8mCEsHj-_TY/edit?usp=sharing"
 
 
-def montar_url_csv(link: str, nome_aba: str = "Coletas") -> str:
+def montar_url_csv(link: str, nome_aba: str = "COLETAS_ENTREGAS") -> str:
     """
     Extrai o identificador da planilha e adiciona o parâmetro 
     da aba específica para exportação em CSV.
@@ -29,7 +29,7 @@ def montar_url_csv(link: str, nome_aba: str = "Coletas") -> str:
 def carregar_coletas_pendentes() -> pd.DataFrame:
     """Consulta o Google Sheets e entrega a fila operacional de coletas pendentes."""
     try:
-        url_csv = montar_url_csv(LINK_COMPARTILHADO, nome_aba="COLETAS E ENTREGAS")
+        url_csv = montar_url_csv(LINK_COMPARTILHADO, nome_aba="COLETAS_ENTREGAS")
         
         # 1. Pergunta ao Pandas: 'Leia os dados tabulares da URL'
         df = pd.read_csv(url_csv)
