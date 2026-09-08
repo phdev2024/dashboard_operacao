@@ -8,7 +8,7 @@ import streamlit as st
 import re
 
 # Cole aqui o link copiado da Planilha Google nativa
-LINK_COMPARTILHADO = "https://docs.google.com/spreadsheets/d/1KSBf6LbG5DffwAJpsCPXp0PmExjeh4_8b6EQDneHvEQ/edit?usp=sharing"
+LINK_COMPARTILHADO = "https://docs.google.com/spreadsheets/d/1CSxm8VLmnpYJb32nqIehYbxaLJyJAvro8mCEsHj-_TY/edit?usp=sharing"
 
 
 def montar_url_csv(link: str, nome_aba: str = "Coletas") -> str:
@@ -29,7 +29,7 @@ def montar_url_csv(link: str, nome_aba: str = "Coletas") -> str:
 def carregar_coletas_pendentes() -> pd.DataFrame:
     """Consulta o Google Sheets e entrega a fila operacional de coletas pendentes."""
     try:
-        url_csv = montar_url_csv(LINK_COMPARTILHADO, nome_aba="Coletas")
+        url_csv = montar_url_csv(LINK_COMPARTILHADO, nome_aba="COLETAS E ENTREGAS")
         
         # 1. Pergunta ao Pandas: 'Leia os dados tabulares da URL'
         df = pd.read_csv(url_csv)
