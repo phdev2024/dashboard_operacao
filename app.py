@@ -38,7 +38,8 @@ if "modo_tv" not in st.session_state:
 # Obtém a última modificação da pasta antes de chamar os dados
 ts_modificacao = obter_timestamp_pasta(PASTA_OPERACIONAL_SAIDA)
 df_operacao = carregar_dados_saida()
-df_coletas = carregar_coletas_pendentes()
+with st.spinner("Sincronizando fila de coletas..."):
+    df_coletas = carregar_coletas_pendentes()
 
 # --- BARRA LATERAL: CONTROLES DE NAVEGAÇÃO & UPLOAD ---
 with st.sidebar:
