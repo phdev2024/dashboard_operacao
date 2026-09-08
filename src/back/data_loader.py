@@ -13,6 +13,23 @@ from src.config.settings import (
 )
 
 
+def obter_timestamp_pasta(pasta: Path) -> float:
+    """Retorna o timestamp da última modificação dos arquivos na pasta."""
+    pasta_alvo = Path(pasta)
+    if not pasta_alvo.exists():
+        return 0.0
+    
+    arquivos = [
+        arq for arq in pasta_alvo.glob("*.*") 
+        if not arq.name.startswith("~$") and arq.suffix.lower() in [".xlsx", ".xls", ".csv"]
+    ]
+    if not arquivos:
+        return 0.0
+    
+    # Pega o horário da modificação mais recente entre todos os arquivos
+    return max(arq.stat().st_mtime for arq in arquivos)
+
+
 def _ler_pasta_arquivos(pasta: Path) -> pd.DataFrame:
     """Lê e consolida os arquivos Excel/CSV iniciando na linha padrão (header=4)."""
     pasta_alvo = Path(pasta)
@@ -60,10 +77,11 @@ def _ler_pasta_arquivos(pasta: Path) -> pd.DataFrame:
     return df_consolidado
 
 
-@st.cache_data(ttl=900)
-def carregar_dados_status_saida(pasta_dados: Path = None) -> pd.DataFrame:
+@st.cache_data(ttl=60)  # Reduzido para 60 segundos para responder rápido a novos arquivos na TV
+def carregar_dados_status_saida(timestamp_pasta: float = 0.0, pasta_dados: Path = None) -> pd.DataFrame:
     """
     Lê a base operacional do mês atual dentro de data/status_saida/operacional/
+    O argumento timestamp_pasta invalida o cache automaticamente se o arquivo for modificado.
     """
     if pasta_dados is not None:
         return _ler_pasta_arquivos(pasta_dados)

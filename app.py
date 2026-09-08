@@ -11,9 +11,9 @@ from src.config.settings import (
     APP_TITLE,
     BRAND_NAME,
     PASTA_OPERACIONAL_SAIDA,
-    PASTA_STATUS_SAIDA
+    PASTA_STATUS_SAIDA,
 )
-from src.back.data_loader import carregar_dados_status_saida as carregar_dados_saida
+from src.back.data_loader import carregar_dados_status_saida as carregar_dados_saida, obter_timestamp_pasta
 from src.back.coletas import carregar_coletas_pendentes
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
@@ -35,6 +35,8 @@ if "modo_tv" not in st.session_state:
     st.session_state.modo_tv = False
 
 # Carrega a base operacional rápida (mês atual) e a fila de coletas pendentes
+# Obtém a última modificação da pasta antes de chamar os dados
+ts_modificacao = obter_timestamp_pasta(PASTA_OPERACIONAL_SAIDA)
 df_operacao = carregar_dados_saida()
 df_coletas = carregar_coletas_pendentes()
 
@@ -68,33 +70,13 @@ with st.sidebar:
     st.markdown("---")
     
     # --- ÁREA DE UPLOAD OPERACIONAL ---
-    with st.expander("📤 Atualizar Dados Operacionais", expanded=False):
-        st.caption("Envie o relatório do mês atual (.xlsx)")
-        arquivo_enviado = st.file_uploader(
-            "Selecione a planilha",
-            type=["xlsx"],
-            accept_multiple_files=False,
-            label_visibility="collapsed"
-        )
-        
-        if arquivo_enviado is not None:
-            if st.button("💾 Salvar e Atualizar TV", use_container_width=True):
-                PASTA_OPERACIONAL_SAIDA.mkdir(parents=True, exist_ok=True)
-                
-                for arquivo_antigo in PASTA_OPERACIONAL_SAIDA.glob("*.*"):
-                    try:
-                        arquivo_antigo.unlink()
-                    except Exception:
-                        pass
-
-                caminho_destino = PASTA_OPERACIONAL_SAIDA / arquivo_enviado.name
-                with open(caminho_destino, "wb") as f:
-                    f.write(arquivo_enviado.getbuffer())
-                
-                st.cache_data.clear()
-                st.success(f"Base operacional atualizada com '{arquivo_enviado.name}'!")
-                time.sleep(1)
-                st.rerun()
+    # --- BOTÃO DE ATUALIZAÇÃO MANUAL ---
+    st.markdown("---")
+    if st.button("🔄 Atualizar Painel Agora", use_container_width=True):
+        st.cache_data.clear()
+        st.toast("Dados atualizados com sucesso!", icon="✅")
+        time.sleep(0.5)
+        st.rerun()
 
 # --- RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":
