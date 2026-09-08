@@ -231,7 +231,7 @@ def exibir_visao_volumes(df: pd.DataFrame):
             st.info("Sem dados de volumes válidos para o gráfico de tendência.")
 
     with col_clientes:
-        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🏢 Top Clientes por Volume (Mês Atual)</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🏢 Top Clientes - Volume (Mês Atual)</h4>", unsafe_allow_html=True)
         
         df_top_clientes = obter_top_clientes_volumes_mes_atual(df, top_n=6)
 
