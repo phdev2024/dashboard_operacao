@@ -100,3 +100,26 @@ def carregar_dados_historicos_saida() -> pd.DataFrame:
     Lê todo o histórico acumulado dentro de data/status_saida/historico/
     """
     return _ler_pasta_arquivos(PASTA_HISTORICO_SAIDA)
+
+def ler_arquivo_upload(uploaded_file) -> pd.DataFrame:
+    """Lê diretamente um arquivo carregado via st.file_uploader sem precisar salvar em disco."""
+    try:
+        nome = uploaded_file.name.lower()
+        if nome.endswith(".csv"):
+            df = pd.read_csv(uploaded_file, sep=None, engine="python", encoding="latin1", header=4)
+        else:
+            df = pd.read_excel(uploaded_file, header=4)
+
+        if df.empty:
+            return pd.DataFrame()
+
+        df.columns = [str(c).strip() for c in df.columns]
+
+        if "Recepção" in df.columns:
+            df["Recepção"] = pd.to_datetime(df["Recepção"], errors="coerce", dayfirst=True)
+            df = df.sort_values(by="Recepção", ascending=True).reset_index(drop=True)
+
+        return df
+    except Exception as e:
+        st.error(f"Erro ao processar planilha enviada: {e}")
+        return pd.DataFrame()
