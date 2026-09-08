@@ -2,11 +2,8 @@
 __pycache__/
 *.pyc
 
-# Dados operacionais e históricos
-data/
-*.xlsx
-*.xls
-*.csv
+# Arquivos temporários do Excel (aqueles que começam com ~$)
+~$*
 
 # Ambientes virtuais
 venv/
