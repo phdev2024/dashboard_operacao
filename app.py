@@ -35,9 +35,9 @@ if "modo_tv" not in st.session_state:
     st.session_state.modo_tv = False
 
 # Carrega a base operacional rápida (mês atual) e a fila de coletas pendentes
-# Obtém a última modificação da pasta antes de chamar os dados
-ts_modificacao = obter_timestamp_pasta(PASTA_OPERACIONAL_SAIDA)
-df_operacao = carregar_dados_saida(timestamp_pasta=ts_modificacao)
+# Obtém a assinatura única da pasta (muda sempre que qualquer arquivo é alterado/colado)
+assinatura_atual = obter_timestamp_pasta(PASTA_OPERACIONAL_SAIDA)
+df_operacao = carregar_dados_saida(assinatura_pasta=assinatura_atual)
 with st.spinner("Sincronizando fila de coletas..."):
     df_coletas = carregar_coletas_pendentes()
 
@@ -71,12 +71,13 @@ with st.sidebar:
     st.markdown("---")
     
     # --- ÁREA DE UPLOAD OPERACIONAL ---
-    # --- BOTÃO DE ATUALIZAÇÃO MANUAL ---
+   # --- BOTÃO DE ATUALIZAÇÃO MANUAL ---
     st.markdown("---")
     if st.button("🔄 Atualizar Painel Agora", use_container_width=True):
         st.cache_data.clear()
+        st.session_state["ultima_atualizacao"] = time.time()
         st.toast("Dados atualizados com sucesso!", icon="✅")
-        time.sleep(0.5)
+        time.sleep(0.3)
         st.rerun()
 
 # --- RENDERIZAÇÃO DA TELA SELECIONADA ---

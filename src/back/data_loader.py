@@ -13,21 +13,23 @@ from src.config.settings import (
 )
 
 
-def obter_timestamp_pasta(pasta: Path) -> float:
-    """Retorna o timestamp da última modificação dos arquivos na pasta."""
+def obter_timestamp_pasta(pasta: Path) -> str:
+    """Retorna uma assinatura única baseada no tamanho e data dos arquivos da pasta."""
     pasta_alvo = Path(pasta)
     if not pasta_alvo.exists():
-        return 0.0
+        return "vazio"
     
     arquivos = [
         arq for arq in pasta_alvo.glob("*.*") 
         if not arq.name.startswith("~$") and arq.suffix.lower() in [".xlsx", ".xls", ".csv"]
     ]
     if not arquivos:
-        return 0.0
+        return "vazio"
     
-    # Pega o horário da modificação mais recente entre todos os arquivos
-    return max(arq.stat().st_mtime for arq in arquivos)
+    # Cria uma assinatura somando o mtime e o tamanho em bytes de todos os arquivos
+    # Se mudar o nome, a data ou o tamanho, a assinatura muda instantaneamente!
+    assinatura = "_".join(f"{arq.name}-{arq.stat().st_mtime}-{arq.stat().st_size}" for arq in arquivos)
+    return assinatura
 
 
 def _ler_pasta_arquivos(pasta: Path) -> pd.DataFrame:
@@ -77,11 +79,11 @@ def _ler_pasta_arquivos(pasta: Path) -> pd.DataFrame:
     return df_consolidado
 
 
-@st.cache_data(ttl=60)  # Reduzido para 60 segundos para responder rápido a novos arquivos na TV
-def carregar_dados_status_saida(timestamp_pasta: float = 0.0, pasta_dados: Path = None) -> pd.DataFrame:
+@st.cache_data(ttl=300)
+def carregar_dados_status_saida(assinatura_pasta: str = "", pasta_dados: Path = None) -> pd.DataFrame:
     """
     Lê a base operacional do mês atual dentro de data/status_saida/operacional/
-    O argumento timestamp_pasta invalida o cache automaticamente se o arquivo for modificado.
+    A assinatura_pasta garante que qualquer mudança no arquivo recarregue os dados na hora.
     """
     if pasta_dados is not None:
         return _ler_pasta_arquivos(pasta_dados)
