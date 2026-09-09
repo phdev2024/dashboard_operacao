@@ -3,37 +3,60 @@ Módulo Frontend: Visão de SLA e Fila Crítica de Expedição
 Monitora pedidos em separação e aguardando expedição com base no horário de corte (12h00).
 """
 
-from datetime import datetime, time as dtime
+from datetime import datetime, timedelta, time as dtime
 import pandas as pd
 import streamlit as st
 
 
 def _definir_farol(data_recepcao: pd.Timestamp, agora: datetime) -> tuple[str, str]:
     """
-    Classifica a criticidade do pedido com base na data de recepção e corte das 12h00:
-    - Dias anteriores (D-1 para trás): Crítico (🔴)
-    - Hoje após 12h00: Atrasado (🔴)
-    - Hoje entre 11h00 e 12h00: Atenção (🟡)
-    - Hoje antes das 11h00: No Prazo (🟢)
+    Classifica a criticidade com base na janela operacional de expedição (dias úteis):
+    - Dias úteis: Segunda a Sexta.
+    - Janela do lote: Do último dia útil às 12h00 até hoje às 12h00.
+    - Prazo fatal de expedição do lote: Hoje até as 18h00.
     """
     if pd.isna(data_recepcao):
         return "🔴 Crítico", "Sem Data"
 
-    data_rec = data_recepcao.date()
-    data_hoje = agora.date()
-    hora_atual = agora.time()
+    data_rec = data_recepcao.to_pydatetime()
+    hoje = agora.date()
 
-    if data_rec < data_hoje:
-        dias_atraso = (data_hoje - data_rec).days
-        return "🔴 Crítico", f"D-{dias_atraso}"
-
-    # Pedidos recebidos hoje
-    if hora_atual >= dtime(12, 0):
-        return "🔴 Atrasado", "Corte 12h Estourado"
-    elif hora_atual >= dtime(11, 0):
-        return "🟡 Atenção", "Janela de Risco"
+    # Define quantos dias voltar para encontrar o último dia útil:
+    # Se hoje é segunda (0), o último dia útil foi sexta (3 dias atrás).
+    # Se hoje for domingo (6), volta 2 dias (sexta).
+    # Se hoje for sábado (5), volta 1 dia (sexta).
+    # Para terça a sexta, volta 1 dia normal.
+    dia_semana = hoje.weekday()
+    if dia_semana == 0:
+        dias_retroativos = 3
+    elif dia_semana == 6:
+        dias_retroativos = 2
+    elif dia_semana == 5:
+        dias_retroativos = 1
     else:
-        return "🟢 No Prazo", "Dentro do Corte"
+        dias_retroativos = 1
+
+    ultimo_dia_util = hoje - timedelta(days=dias_retroativos)
+    inicio_lote_hoje = datetime.combine(ultimo_dia_util, dtime(12, 0, 0))
+    corte_lote_hoje = datetime.combine(hoje, dtime(12, 0, 0))
+
+    # Caso 1: Entrou antes das 12h00 do último dia útil (já deveria ter saído)
+    if data_rec < inicio_lote_hoje:
+        dias_atraso = (hoje - data_rec.date()).days
+        return "🔴 Crítico", f"Pendente D-{dias_atraso}"
+
+    # Caso 2: Entrou hoje após as 12h00 (pertence ao lote do próximo dia útil)
+    if data_rec > corte_lote_hoje:
+        return "🟢 No Prazo", "Lote Seguinte"
+
+    # Caso 3: Lote Operacional do Dia (meta de saída até 18h00)
+    hora_atual = agora.time()
+    if hora_atual >= dtime(18, 0):
+        return "🔴 Atrasado", "Expedição 18h Estourada"
+    elif hora_atual >= dtime(16, 0):
+        return "🟡 Atenção", "Janela Final (Até 18h)"
+    else:
+        return "🟢 No Prazo", "Meta Hoje 18h"
 
 
 def exibir_visao_sla(df: pd.DataFrame):
@@ -107,11 +130,11 @@ def exibir_visao_sla(df: pd.DataFrame):
     with c1:
         st.metric("Total na Fila", f"{total_pendente} ped.")
     with c2:
-        st.metric("🔴 Fora do Corte / D-1", f"{total_critico} ped.")
+        st.metric("🔴 Crítico / Atrasado", f"{total_critico} ped.")
     with c3:
-        st.metric("🟡 Em Risco (Pré-Corte)", f"{total_atencao} ped.")
+        st.metric("🟡 Reta Final (16h - 18h)", f"{total_atencao} ped.")
     with c4:
-        st.metric("🟢 Dentro da Janela", f"{total_no_prazo} ped.")
+        st.metric("🟢 Meta Hoje 18h / Novo Lote", f"{total_no_prazo} ped.")
 
     st.markdown("---")
 
