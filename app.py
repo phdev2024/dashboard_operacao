@@ -22,6 +22,7 @@ from src.back.coletas import carregar_coletas_pendentes
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
 from src.front.views_coletas import exibir_visao_coletas
+from src.front.views_sla import exibir_visao_sla
 
 # Configuração da página
 st.set_page_config(
@@ -51,6 +52,7 @@ with st.sidebar:
     opcoes_telas = {
         "Notas": "Notas Recebidas",
         "Volumes": "Volumes & Clientes",
+        "SLA": "Radar de SLA & Alertas",
         "Coletas": "Programação de Coletas"
     }
     opcoes_invertidas = {v: k for k, v in opcoes_telas.items()}
@@ -97,6 +99,8 @@ if st.session_state.tela_ativa == "Notas":
     exibir_visao_saida(df_operacao)
 elif st.session_state.tela_ativa == "Volumes":
     exibir_visao_volumes(df_operacao)
+elif st.session_state.tela_ativa == "SLA":
+    exibir_visao_sla(df_operacao)
 elif st.session_state.tela_ativa == "Coletas":
     exibir_visao_coletas(df_coletas)
 
@@ -104,10 +108,11 @@ elif st.session_state.tela_ativa == "Coletas":
 if st.session_state.modo_tv:
     time.sleep(tempo_troca)
     
-    # Ordem de transição da esteira: Notas -> Volumes -> Coletas -> Notas
+    # Ordem: Notas -> Volumes -> SLA -> Coletas -> Notas
     proxima_tela = {
         "Notas": "Volumes",
-        "Volumes": "Coletas",
+        "Volumes": "SLA",
+        "SLA": "Coletas",
         "Coletas": "Notas"
     }
     st.session_state.tela_ativa = proxima_tela.get(st.session_state.tela_ativa, "Notas")
