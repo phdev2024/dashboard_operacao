@@ -169,7 +169,7 @@ def exibir_visao_volumes(df: pd.DataFrame):
         st.markdown(
             f"""
             <div class='kpi-card'>
-                <div class='kpi-title'>Volumes Pendentes</div>
+                <div class='kpi-title'>Volumes Produzidos</div>
                 <div class='kpi-value' style='color: {cor_pendencia};'>{total_volumes_pendentes:,}</div>
             </div>
             """.replace(",", "."), unsafe_allow_html=True

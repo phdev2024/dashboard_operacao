@@ -85,6 +85,7 @@ def exibir_visao_sla(df: pd.DataFrame):
     # Filtra apenas o funil operacional de risco
     # Filtra apenas o funil operacional de risco (aceita com ou sem acentuação)
     status_alvo = [
+        "EM PENDENTE", "PENDENTE",
         "EM SEPARACAO", "EM SEPARAÇÃO",
         "AGUARDANDO EXPEDICAO", "AGUARDANDO EXPEDIÇÃO"
     ]
@@ -160,10 +161,37 @@ def exibir_visao_sla(df: pd.DataFrame):
     df_agrupado["Entrada_Mais_Antiga"] = df_agrupado["Entrada_Mais_Antiga"].dt.strftime("%d/%m %H:%M").fillna("-")
     df_agrupado["Total_Volumes"] = df_agrupado["Total_Volumes"].astype(int)
 
-    # Ordem customizada: Vermelho primeiro, depois Amarelo, depois Verde
-    ordem_farol = {"🔴 Crítico": 1, "🔴 Atrasado": 2, "🟡 Atenção": 3, "🟢 No Prazo": 4}
-    df_agrupado["Ordem"] = df_agrupado["Farol"].map(ordem_farol).fillna(5)
-    df_agrupado = df_agrupado.sort_values(by=["Ordem", "Qtd_Pedidos"], ascending=[True, False]).drop(columns=["Ordem"])
+    # 1. Mapeamento de prioridade do Farol
+    ordem_farol = {
+        "🔴 Crítico": 1, 
+        "🔴 Atrasado": 2, 
+        "🟡 Atenção": 3, 
+        "🟢 No Prazo": 4
+    }
+    df_agrupado["Ordem_Farol"] = df_agrupado["Farol"].map(ordem_farol).fillna(99)
+
+    # 2. Mapeamento de prioridade do Status da Operação
+    # Criamos uma chave padronizada (maiúscula e sem espaços extras) para mapear com segurança
+    def classificar_ordem_status(status_valor: str) -> int:
+        status_txt = str(status_valor).strip().upper()
+        if "PENDENTE" in status_txt:
+            return 1
+        elif "SEPARA" in status_txt:  # Cobre "EM SEPARAÇÃO" e "EM SEPARACAO"
+            return 2
+        elif "EXPEDI" in status_txt:  # Cobre "AGUARDANDO EXPEDIÇÃO" e "AGUARDANDO EXPEDICAO"
+            return 3
+        return 99
+
+    df_agrupado["Ordem_Status"] = df_agrupado[col_status].apply(classificar_ordem_status)
+
+    # 3. Ordenação multinível:
+    # 1º Farol (Crítico -> Atenção -> No Prazo)
+    # 2º Status (Pendente -> Separação -> Expedição)
+    # 3º Quantidade de Pedidos (Maior fila primeiro)
+    df_agrupado = df_agrupado.sort_values(
+        by=["Ordem_Farol", "Ordem_Status", "Qtd_Pedidos"], 
+        ascending=[True, True, False]
+    ).drop(columns=["Ordem_Farol", "Ordem_Status"])
 
     df_agrupado.rename(
         columns={
