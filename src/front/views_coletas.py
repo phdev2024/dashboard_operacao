@@ -109,8 +109,8 @@ def exibir_visao_coletas(df: pd.DataFrame):
             """
             <div class='doca-livre-box'>
                 <div class='doca-livre-icone'>🟢 🚛</div>
-                <div class='doca-livre-titulo'>DOCAS LIVRES</div>
-                <div class='doca-livre-sub'>Nenhuma coleta pendente no momento. Pátio e expedição liberados!</div>
+                <div class='doca-livre-titulo'>Não Há Coletas Pendentes</div>
+                
             </div>
             """,
             unsafe_allow_html=True
