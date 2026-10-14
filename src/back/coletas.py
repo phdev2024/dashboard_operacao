@@ -1,5 +1,5 @@
 """
-Módulo de Integração: Coletas Agendadas (Google Sheets Nativo)
+Módulo de Integração: Controle de Transporte (Google Sheets Nativo)
 Lê diretamente via exportação CSV leve e em tempo real com retry defensivo.
 """
 
@@ -25,7 +25,7 @@ def montar_url_csv(link: str, nome_aba: str = "COLETAS E ENTREGAS") -> str:
 
 @st.cache_data(ttl=180)
 def carregar_coletas_pendentes() -> pd.DataFrame:
-    """Consulta o Google Sheets com até 3 tentativas para contornar oscilações de rede."""
+    """Consulta o Google Sheets trazendo todas as operações ativas (exceto Finalizadas)."""
     url_csv = montar_url_csv(LINK_COMPARTILHADO)
 
     for tentativa in range(3):
@@ -40,23 +40,54 @@ def carregar_coletas_pendentes() -> pd.DataFrame:
             if "STATUS" not in df.columns:
                 return pd.DataFrame()
 
-            df_pendentes = df[df["STATUS"].astype(str).str.strip().str.upper() == "PENDENTE"].copy()
-            if df_pendentes.empty:
+            # 1. PERGUNTA: Quais registros NÃO devem subir para a TV?
+            # RESPOSTA: O que já foi concluído/finalizado ou marcado como entregue anteriormente.
+            status_excluidos = ["FINALIZADO", "ENTREGUE"]
+            df["STATUS_LIMPO"] = df["STATUS"].astype(str).str.strip().str.upper()
+            df_ativos = df[~df["STATUS_LIMPO"].isin(status_excluidos)].copy()
+
+            if df_ativos.empty:
                 return pd.DataFrame()
 
+            # 2. PERGUNTA: Quais colunas a operação precisa enxergar na TV?
+            # Incluímos o STATUS agora de forma visível
             colunas_vitais = [
-                "DATA COLETA", "CLIENTE", "PEDIDO / NF", 
+                "STATUS", "DATA COLETA", "CLIENTE", "PEDIDO / NF", 
                 "TIPO DE OPERAÇÃO", "MOTORISTA", "PLACA", "VEICULO", "REGIÃO"
             ]
-            colunas_existentes = [col for col in colunas_vitais if col in df_pendentes.columns]
-            df_operacao = df_pendentes[colunas_existentes].copy()
+            colunas_existentes = [col for col in colunas_vitais if col in df_ativos.columns]
+            df_operacao = df_ativos[colunas_existentes].copy()
 
+            # 3. REGRA DE ORDENAÇÃO MULTINÍVEL:
+            # Função para dar peso de prioridade a cada status
+            def mapear_ordem_status(status_txt: str) -> int:
+                st_upper = str(status_txt).strip().upper()
+                if "PENDENTE" in st_upper:
+                    return 1
+                elif "TRANSIT" in st_upper:
+                    return 2
+                elif "ANDAMENTO" in st_upper:
+                    return 3
+                return 4
+
+            df_operacao["Ordem_Status"] = df_operacao["STATUS"].apply(mapear_ordem_status)
+
+            # Conversão defensiva de data para ordenação cronológica
             if "DATA COLETA" in df_operacao.columns:
                 df_operacao["Data_Ref"] = pd.to_datetime(
                     df_operacao["DATA COLETA"], format="%d/%m/%Y", errors="coerce"
                 )
-                df_operacao = df_operacao.sort_values(by="Data_Ref", ascending=True)
-                df_operacao = df_operacao.drop(columns=["Data_Ref"])
+            else:
+                df_operacao["Data_Ref"] = pd.NaT
+
+            # Ordena por: 1º Status (Pendente -> Em Trânsito -> Em Andamento), 2º Data mais antiga
+            df_operacao = df_operacao.sort_values(
+                by=["Ordem_Status", "Data_Ref"], 
+                ascending=[True, True]
+            )
+
+            # Remove colunas auxiliares para deixar a tabela visualmente limpa
+            df_operacao = df_operacao.drop(columns=["Ordem_Status", "Data_Ref"])
 
             return df_operacao
 

@@ -51,12 +51,12 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # 1. Ponto de Inclusão: Mapeamento amigável para o seletor manual
+    # Mapeamento amigável para o seletor manual
     opcoes_telas = {
         "Notas": "Notas Recebidas",
         "Volumes": "Volumes & Clientes",
         "SLA": "Radar de SLA & Alertas",
-        "Coletas": "Programação de Coletas",
+        "Coletas": "Controle de Transporte",
         "Mapa": "Malha de Hubs & Bases"
     }
     opcoes_invertidas = {v: k for k, v in opcoes_telas.items()}
@@ -114,7 +114,7 @@ elif st.session_state.tela_ativa == "Coletas":
 elif st.session_state.tela_ativa == "Mapa":
     exibir_visao_mapa(df_mapa)
 
-# --- 3. Ponto de Inclusão: MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
+# --- MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
 if st.session_state.modo_tv:
     time.sleep(tempo_troca)
     

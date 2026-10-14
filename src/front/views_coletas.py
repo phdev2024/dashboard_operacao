@@ -88,7 +88,7 @@ def renderizar_css_tv():
 def exibir_visao_coletas(df: pd.DataFrame):
     renderizar_css_tv()
 
-    # --- 1. CABEÇALHO ---
+   # --- 1. CABEÇALHO ---
     caminho_logo = Path("data/media/logo_logcare.png")
     c1, c2 = st.columns([3, 8.5], vertical_alignment="center")
     
@@ -99,18 +99,18 @@ def exibir_visao_coletas(df: pd.DataFrame):
             st.markdown(f"<h2 style='color: {COLOR_BRAND_PRIMARY}; margin:0;'>LOGCARE</h2>", unsafe_allow_html=True)
             
     with c2:
-        st.markdown("<h2 class='header-title' style='padding-left: 15px;'>Painel Operacional - Programação de Coletas</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='header-title' style='padding-left: 15px;'>Painel Operacional - Controle de Transporte</h2>", unsafe_allow_html=True)
 
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px; border-color: #223834;'>", unsafe_allow_html=True)
 
-    # --- 2. QUANDO NÃO HÁ COLETAS PENDENTES (DOCA LIVRE) ---
+    # --- 2. QUANDO NÃO HÁ TRANSPORTES ATIVOS ---
     if df.empty:
         st.markdown(
             """
             <div class='doca-livre-box'>
                 <div class='doca-livre-icone'>🟢 🚛</div>
-                <div class='doca-livre-titulo'>Não Há Coletas Pendentes</div>
-                
+                <div class='doca-livre-titulo'>Todos os Transportes Finalizados</div>
+                <div class='doca-livre-sub'>Nenhuma coleta ou transporte em andamento no momento.</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -176,8 +176,8 @@ def exibir_visao_coletas(df: pd.DataFrame):
 
     st.write("")
 
-    # --- 5. LISTAGEM OPERACIONAL DE COLETAS ---
-    st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🚛 Fila de Coletas Programadas</h4>", unsafe_allow_html=True)
+    # --- 5. LISTAGEM OPERACIONAL DE TRANSPORTES ---
+    st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🚛 Fila Ativa de Transportes</h4>", unsafe_allow_html=True)
 
     st.dataframe(
         df,
