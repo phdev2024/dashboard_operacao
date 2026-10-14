@@ -1,6 +1,6 @@
 """
 Ponto de Entrada Principal (Main Application)
-Painel Operacional Logcare com Suporte a Carrossel de TV, Coletas e Upload Inteligente
+Painel Operacional Logcare com Suporte a Carrossel de TV, Coletas, Upload Inteligente e Mapa de Hubs
 """
 
 import streamlit as st
@@ -19,10 +19,13 @@ from src.back.data_loader import (
     ler_arquivo_upload
 )
 from src.back.coletas import carregar_coletas_pendentes
+from src.back.bases_hubs import processar_base_hubs
+
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
 from src.front.views_coletas import exibir_visao_coletas
 from src.front.views_sla import exibir_visao_sla
+from src.front.views_mapa import exibir_visao_mapa
 
 # Configuração da página
 st.set_page_config(
@@ -48,12 +51,13 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Mapeamento amigável para o seletor manual
+    # 1. Ponto de Inclusão: Mapeamento amigável para o seletor manual
     opcoes_telas = {
         "Notas": "Notas Recebidas",
         "Volumes": "Volumes & Clientes",
         "SLA": "Radar de SLA & Alertas",
-        "Coletas": "Programação de Coletas"
+        "Coletas": "Programação de Coletas",
+        "Mapa": "Malha de Hubs & Bases"
     }
     opcoes_invertidas = {v: k for k, v in opcoes_telas.items()}
 
@@ -63,11 +67,9 @@ with st.sidebar:
         index=list(opcoes_telas.keys()).index(st.session_state.tela_ativa)
     )
     
-    # Se o modo TV estiver desligado, obedece à escolha manual do operador
     if not st.session_state.modo_tv:
         st.session_state.tela_ativa = opcoes_invertidas[escolha_manual]
 
-    # --- ÁREA DE UPLOAD OPERACIONAL NA BARRA LATERAL ---
     st.markdown("---")
     st.subheader("📤 Atualização Operacional")
     
@@ -83,18 +85,24 @@ with st.sidebar:
         time.sleep(0.3)
         st.rerun()
 
-# --- CARREGAMENTO INTELIGENTE DOS DADOS (PRIORIDADE AO UPLOAD) ---
+# --- CARREGAMENTO DOS DADOS ---
 if arquivo_enviado is not None:
     df_operacao = ler_arquivo_upload(arquivo_enviado)
 else:
     assinatura_atual = obter_timestamp_pasta(PASTA_OPERACIONAL_SAIDA)
     df_operacao = carregar_dados_saida(assinatura_pasta=assinatura_atual)
 
-# Carrega a fila de coletas do Google Sheets com spinner de proteção
 with st.spinner("Sincronizando fila de coletas..."):
     df_coletas = carregar_coletas_pendentes()
 
-# --- RENDERIZAÇÃO DA TELA SELECIONADA ---
+# Cache dos dados do mapa para não consultar geocodificação a cada troca de tela
+@st.cache_data
+def carregar_dados_mapa():
+    return processar_base_hubs()
+
+df_mapa = carregar_dados_mapa()
+
+# --- 2. Ponto de Inclusão: RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":
     exibir_visao_saida(df_operacao)
 elif st.session_state.tela_ativa == "Volumes":
@@ -103,17 +111,20 @@ elif st.session_state.tela_ativa == "SLA":
     exibir_visao_sla(df_operacao)
 elif st.session_state.tela_ativa == "Coletas":
     exibir_visao_coletas(df_coletas)
+elif st.session_state.tela_ativa == "Mapa":
+    exibir_visao_mapa(df_mapa)
 
-# --- MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
+# --- 3. Ponto de Inclusão: MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
 if st.session_state.modo_tv:
     time.sleep(tempo_troca)
     
-    # Ordem: Notas -> Volumes -> SLA -> Coletas -> Notas
+    # Ordem: Notas -> Volumes -> SLA -> Coletas -> Mapa -> Notas
     proxima_tela = {
         "Notas": "Volumes",
         "Volumes": "SLA",
         "SLA": "Coletas",
-        "Coletas": "Notas"
+        "Coletas": "Mapa",
+        "Mapa": "Notas"
     }
     st.session_state.tela_ativa = proxima_tela.get(st.session_state.tela_ativa, "Notas")
     st.rerun()
