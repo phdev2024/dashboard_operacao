@@ -6,6 +6,7 @@ Painel Operacional Logcare com Suporte a Carrossel de TV, Coletas, Upload Inteli
 import streamlit as st
 import time
 from pathlib import Path
+import os
 
 from src.config.settings import (
     APP_TITLE,
@@ -95,12 +96,24 @@ else:
 with st.spinner("Sincronizando fila de coletas..."):
     df_coletas = carregar_coletas_pendentes()
 
-# Cache dos dados do mapa para não consultar geocodificação a cada troca de tela
+# Pergunta ao sistema: "Quando foi a última vez que o ficheiro bases_hubs.xlsx foi modificado?"
+def obter_timestamp_hubs():
+    caminho = "data/bases_hubs.xlsx" if os.path.exists("data/bases_hubs.xlsx") else "bases_hubs.xlsx"
+    return os.path.getmtime(caminho) if os.path.exists(caminho) else 0
+
+
+# Pergunta ao sistema: "Qual a data/hora da última alteração no arquivo bases_hubs.xlsx?"
+def obter_modificacao_planilha_hubs():
+    caminho = "data/bases_hubs.xlsx" if os.path.exists("data/bases_hubs.xlsx") else "bases_hubs.xlsx"
+    return os.path.getmtime(caminho) if os.path.exists(caminho) else 0
+
+# O Streamlit só usa o cache se a data de modificação da planilha for a mesma!
+# Se você salvar uma linha nova, a data muda e ele recarrega na hora:
 @st.cache_data
-def carregar_dados_mapa():
+def carregar_dados_mapa(timestamp_arquivo):
     return processar_base_hubs()
 
-df_mapa = carregar_dados_mapa()
+df_mapa = carregar_dados_mapa(obter_modificacao_planilha_hubs())
 
 # --- 2. Ponto de Inclusão: RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":
