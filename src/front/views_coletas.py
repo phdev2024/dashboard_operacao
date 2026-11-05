@@ -102,6 +102,11 @@ def exibir_visao_coletas(df: pd.DataFrame):
         st.markdown("<h2 class='header-title' style='padding-left: 15px;'>Painel Operacional - Controle de Transporte</h2>", unsafe_allow_html=True)
 
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px; border-color: #223834;'>", unsafe_allow_html=True)
+    
+
+    status_excluir = ["FINALIZADO", "ENTREGUE"]
+    if "STATUS" in df.columns:
+        df = df[~df["STATUS"].str.upper().str.strip().isin(status_excluir)]
 
     # --- 2. QUANDO NÃO HÁ TRANSPORTES ATIVOS ---
     if df.empty:
@@ -123,10 +128,26 @@ def exibir_visao_coletas(df: pd.DataFrame):
     coletas_hoje = 0
     coletas_futuras = 0
 
+    # Cálculo de coletas programadas para hoje
     if "DATA COLETA" in df.columns:
-        datas_convertidas = pd.to_datetime(df["DATA COLETA"], format="%d/%m/%Y", errors="coerce").dt.date
-        coletas_hoje = int((datas_convertidas == hoje).sum())
-        coletas_futuras = int((datas_convertidas > hoje).sum())
+        try:
+            # Converter datas (pode conter NaT para valores inválidos)
+            datas_convertidas = pd.to_datetime(df["DATA COLETA"], format="%d/%m/%Y", errors="coerce")
+            
+            # Remover datas inválidas antes de comparar
+            datas_validas = datas_convertidas.dropna()
+
+            if not datas_validas.empty:
+                coletas_hoje = int((datas_validas.dt.date == hoje).sum())
+                coletas_futuras = int((datas_validas.dt.date > hoje).sum())
+            else:
+                coletas_hoje = 0
+                coletas_futuras = 0
+            
+        except Exception as e:
+            st.warning(f"⚠️ Erro ao processar datas de coleta: {e}")
+            coletas_hoje = 0
+            coletas_futuras = 0
 
     veiculos_unicos = df["PLACA"].nunique() if "PLACA" in df.columns else total_pendentes
 
