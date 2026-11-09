@@ -157,6 +157,12 @@ def exibir_visao_sla(df: pd.DataFrame):
         Entrada_Mais_Antiga=("Data_Ref", "min")
     )
 
+    def abreviar_cliente(nome, limite=15):
+        nome = str(nome).strip()
+        return nome if len(nome) <= limite else nome[:limite] + "..."
+
+    df_agrupado[col_cliente_real] = df_agrupado[col_cliente_real].apply(abreviar_cliente)
+
     # Formatação de datas e ordenação por criticidade
     df_agrupado["Entrada_Mais_Antiga"] = df_agrupado["Entrada_Mais_Antiga"].dt.strftime("%d/%m %H:%M").fillna("-")
     df_agrupado["Total_Volumes"] = df_agrupado["Total_Volumes"].astype(int)
@@ -169,6 +175,7 @@ def exibir_visao_sla(df: pd.DataFrame):
         "🟢 No Prazo": 4
     }
     df_agrupado["Ordem_Farol"] = df_agrupado["Farol"].map(ordem_farol).fillna(99)
+    
 
     # 2. Mapeamento de prioridade do Status da Operação
     # Criamos uma chave padronizada (maiúscula e sem espaços extras) para mapear com segurança
