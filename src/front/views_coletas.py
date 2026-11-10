@@ -1,5 +1,6 @@
 """
 Módulo Frontend: Visão Operacional de Coletas e Transportes (Tela 3)
+Com funcionalidade de Ordem de Coleta
 """
 
 import streamlit as st
@@ -33,54 +34,64 @@ def renderizar_css_tv():
                 padding: 12px;
                 text-align: center;
                 box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+                min-height: 90px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }}
             .kpi-title {{
-                color: #8DAA9D;
-                font-size: 0.8rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+                color: {COLOR_TEXT_MUTED};
+                font-size: 14px;
+                font-weight: 500;
                 margin-bottom: 4px;
             }}
             .kpi-value {{
-                font-size: 2.2rem;
-                font-weight: 800;
-                line-height: 1.1;
+                color: {COLOR_BRAND_PRIMARY};
+                font-size: 32px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
             }}
             .header-title {{
-                color: #FFFFFF;
-                font-size: 1.8rem;
-                font-weight: 800;
-                margin: 0;
+                color: {COLOR_TEXT_LIGHT};
+                font-weight: 300;
+                font-size: 2.2rem;
+                letter-spacing: -0.5px;
             }}
             .doca-livre-box {{
-                background: linear-gradient(145deg, #10261f, #16362c);
-                border: 2px solid #2bb673;
-                border-radius: 16px;
-                padding: 45px 25px;
                 text-align: center;
+                padding: 60px 20px;
+                background-color: rgba(30, 90, 40, 0.2);
+                border: 2px dashed #2e7d32;
+                border-radius: 10px;
                 margin-top: 30px;
-                box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.4);
             }}
             .doca-livre-icone {{
-                font-size: 4.5rem;
-                line-height: 1;
-                margin-bottom: 15px;
+                font-size: 48px;
+                margin-bottom: 10px;
             }}
             .doca-livre-titulo {{
-                color: #FFFFFF;
-                font-size: 2.4rem;
-                font-weight: 800;
-                letter-spacing: 1px;
+                color: #4CAF50;
+                font-size: 26px;
+                font-weight: 700;
                 margin-bottom: 8px;
             }}
             .doca-livre-sub {{
-                color: #8DAA9D;
-                font-size: 1.2rem;
-                font-weight: 500;
+                color: #aaaaaa;
+                font-size: 16px;
+            }}
+            .ordem-coleta-badge {{
+                background-color: {COLOR_BRAND_PRIMARY};
+                color: white;
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 13px;
+                display: inline-block;
+                min-width: 30px;
+                text-align: center;
             }}
         </style>
-        """,
+        """, 
         unsafe_allow_html=True
     )
 
@@ -88,7 +99,7 @@ def renderizar_css_tv():
 def exibir_visao_coletas(df: pd.DataFrame):
     renderizar_css_tv()
 
-   # --- 1. CABEÇALHO ---
+    # --- 1. CABEÇALHO ---
     caminho_logo = Path("data/media/logo_logcare.png")
     c1, c2 = st.columns([3, 8.5], vertical_alignment="center")
     
@@ -103,13 +114,8 @@ def exibir_visao_coletas(df: pd.DataFrame):
 
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px; border-color: #223834;'>", unsafe_allow_html=True)
     
-
-    status_excluir = ["FINALIZADO", "ENTREGUE"]
-    if "STATUS" in df.columns:
-        df = df[~df["STATUS"].str.upper().str.strip().isin(status_excluir)]
-
-    # --- 2. QUANDO NÃO HÁ TRANSPORTES ATIVOS ---
-    if df.empty:
+    # --- VALIDAÇÃO DO DATAFRAME ---
+    if df is None or df.empty:
         st.markdown(
             """
             <div class='doca-livre-box'>
@@ -120,9 +126,9 @@ def exibir_visao_coletas(df: pd.DataFrame):
             """,
             unsafe_allow_html=True
         )
-        return
+        return  # ← ESTE return está correto, fecha a função se não há dados
 
-    # --- 3. CÁLCULO DE MÉTRICAS OPERACIONAIS ---
+    # --- 2. CÁLCULO DE MÉTRICAS OPERACIONAIS ---
     total_pendentes = len(df)
     hoje = date.today()
     coletas_hoje = 0
@@ -136,22 +142,17 @@ def exibir_visao_coletas(df: pd.DataFrame):
             
             # Remover datas inválidas antes de comparar
             datas_validas = datas_convertidas.dropna()
-
-            if not datas_validas.empty:
-                coletas_hoje = int((datas_validas.dt.date == hoje).sum())
-                coletas_futuras = int((datas_validas.dt.date > hoje).sum())
-            else:
-                coletas_hoje = 0
-                coletas_futuras = 0
             
-        except Exception as e:
-            st.warning(f"⚠️ Erro ao processar datas de coleta: {e}")
+            # Contar as de hoje e as futuras
+            coletas_hoje = (datas_validas.dt.date == hoje).sum()
+            coletas_futuras = (datas_validas.dt.date > hoje).sum()
+        except Exception:
             coletas_hoje = 0
             coletas_futuras = 0
 
     veiculos_unicos = df["PLACA"].nunique() if "PLACA" in df.columns else total_pendentes
 
-    # --- 4. LINHA DE CARDS KPI ---
+    # --- 3. LINHA DE CARDS KPI ---
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -195,14 +196,57 @@ def exibir_visao_coletas(df: pd.DataFrame):
             """, unsafe_allow_html=True
         )
 
-    st.write("")
+    st.write("")  # Espaço vazio para separação
 
+    # --- 4. TRATAMENTO DA ORDEM DE COLETA ---
+    def formatar_ordem(valor):
+        """Converte números em formato de ordem: 1 -> '1º', 2 -> '2º', etc."""
+        if pd.isna(valor) or valor == "" or str(valor).strip() == "":
+            return ""
+        try:
+            num = float(str(valor).strip())
+            if num.is_integer():
+                return f"{int(num)}º"
+            else:
+                return f"{int(round(num))}º"
+        except:
+            return str(valor)
+
+    # Se houver coluna ORDEM COLETA, vamos processá-la
+    if "ORDEM COLETA" in df.columns:
+        # Criar nova coluna formatada
+        df["ORDEM"] = df["ORDEM COLETA"].apply(formatar_ordem)
+        
+        # Reorganizar colunas para que ORDEM aparece primeiro
+        colunas = list(df.columns)
+        colunas.remove("ORDEM COLETA")
+        colunas.remove("ORDEM")
+        
+        # Criar nova ordem das colunas
+        ordem_colunas = ["ORDEM"] + colunas
+        
+        # Reorganizar DataFrame
+        df = df[ordem_colunas]
+    
     # --- 5. LISTAGEM OPERACIONAL DE TRANSPORTES ---
     st.markdown(f"<h4 style='color: {COLOR_TEXT_LIGHT}; margin-bottom: 10px;'>🚛 Fila Ativa de Transportes</h4>", unsafe_allow_html=True)
-
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        height=420
-    )
+    
+    # VERIFICAÇÃO FINAL: garantir que df não está vazio
+    if not df.empty:
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            height=420
+        )
+    else:
+        st.markdown(
+            """
+            <div class='doca-livre-box'>
+                <div class='doca-livre-icone'>ℹ️</div>
+                <div class='doca-livre-titulo'>Sem dados para exibir</div>
+                <div class='doca-livre-sub'>Os registros podem não conter colunas esperadas ou podem estar vazios.</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )

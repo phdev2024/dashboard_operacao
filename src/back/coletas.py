@@ -1,6 +1,7 @@
 """
 Módulo de Integração: Controle de Transporte (Google Sheets Nativo)
 Lê diretamente via exportação CSV leve e em tempo real com retry defensivo.
+Com funcionalidade de Ordem de Coleta
 """
 
 import time
@@ -21,6 +22,17 @@ def montar_url_csv(link: str, nome_aba: str = "COLETAS E ENTREGAS") -> str:
         aba_codificada = quote_plus(nome_aba)
         return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={aba_codificada}"
     return link
+
+
+def mapear_ordem_status(status_txt: str) -> int:
+    """Função para dar peso de prioridade a cada status."""
+    st_upper = str(status_txt).strip().upper()
+    if "PENDENTE" in st_upper:
+        return 1  # Primeira prioridade
+    elif "EM ANDAMENTO" in st_upper or "EM TRÂNSITO" in st_upper:
+        return 2  # Segunda prioridade
+    else:
+        return 3  # Terceira prioridade (outros)
 
 
 @st.cache_data(ttl=180)
@@ -52,49 +64,70 @@ def carregar_coletas_pendentes() -> pd.DataFrame:
             # 2. PERGUNTA: Quais colunas a operação precisa enxergar na TV?
             # Incluímos o STATUS agora de forma visível
             colunas_vitais = [
-                "STATUS", "DATA COLETA", "CLIENTE", "PEDIDO / NF", 
-                "TIPO DE OPERAÇÃO", "MOTORISTA", "PLACA", "VEICULO", "REGIÃO"
+                "ORDEM COLETA",  # ← NOVA COLUNA - ordem numérica do usuário
+                "STATUS", 
+                "DATA COLETA", 
+                "CLIENTE", 
+                "PEDIDO / NF", 
+                "TIPO DE OPERAÇÃO", 
+                "MOTORISTA", 
+                "PLACA", 
+                "VEICULO", 
+                "REGIÃO"
             ]
             colunas_existentes = [col for col in colunas_vitais if col in df_ativos.columns]
             df_operacao = df_ativos[colunas_existentes].copy()
 
-            # 3. REGRA DE ORDENAÇÃO MULTINÍVEL:
-            # Função para dar peso de prioridade a cada status
-            def mapear_ordem_status(status_txt: str) -> int:
-                st_upper = str(status_txt).strip().upper()
-                if "PENDENTE" in st_upper:
-                    return 1
-                elif "TRANSIT" in st_upper:
-                    return 2
-                elif "ANDAMENTO" in st_upper:
-                    return 3
-                return 4
-
-            df_operacao["Ordem_Status"] = df_operacao["STATUS"].apply(mapear_ordem_status)
-
-            # Conversão defensiva de data para ordenação cronológica
+            # 3. REGRA DE ORDENAÇÃO MULTINÍVEL NOVA:
+            # --- INICIALIZAR LISTA DE CRITÉRIOS DE ORDENAÇÃO ---
+            ordem_colunas = []
+            
+            # 3.1. PRIMEIRO CRITÉRIO: ORDEM COLETA (se existir e estiver preenchida)
+            if "ORDEM COLETA" in df_operacao.columns:
+                # Criar coluna numérica para ordenação
+                df_operacao["_ORDEM_NUM"] = pd.to_numeric(
+                    df_operacao["ORDEM COLETA"], 
+                    errors='coerce'
+                ).fillna(999)  # Colocar valores inválidos/nulos no final (999)
+                ordem_colunas.append("_ORDEM_NUM")
+            
+            # 3.2. SEGUNDO CRITÉRIO: Status (mantém a prioridade original)
+            if "STATUS" in df_operacao.columns:
+                df_operacao["_PESO_STATUS"] = df_operacao["STATUS"].apply(mapear_ordem_status)
+                ordem_colunas.append("_PESO_STATUS")
+            
+            # 3.3. TERCEIRO CRITÉRIO: Data de Coleta
             if "DATA COLETA" in df_operacao.columns:
-                df_operacao["Data_Ref"] = pd.to_datetime(
-                    df_operacao["DATA COLETA"], format="%d/%m/%Y", errors="coerce"
+                # Converter para datetime para ordenação cronológica correta
+                df_operacao["_DATA_DT"] = pd.to_datetime(
+                    df_operacao["DATA COLETA"], 
+                    format="%d/%m/%Y", 
+                    errors="coerce"
                 )
-            else:
-                df_operacao["Data_Ref"] = pd.NaT
-
-            # Ordena por: 1º Status (Pendente -> Em Trânsito -> Em Andamento), 2º Data mais antiga
-            df_operacao = df_operacao.sort_values(
-                by=["Ordem_Status", "Data_Ref"], 
-                ascending=[True, True]
+                ordem_colunas.append("_DATA_DT")
+            
+            # APLICAR ORDENAÇÃO SE HOUVER CRITÉRIOS
+            if ordem_colunas:
+                df_operacao = df_operacao.sort_values(
+                    by=ordem_colunas, 
+                    ascending=[True, True, True]  # Ordem crescente para todos
+                ).reset_index(drop=True)
+            
+            # REMOVER COLUNAS AUXILIARES
+            colunas_aux_remover = [
+                "_ORDEM_NUM", "_PESO_STATUS", "_DATA_DT", 
+                "STATUS_LIMPO"
+            ]
+            df_operacao = df_operacao.drop(
+                columns=[col for col in colunas_aux_remover if col in df_operacao.columns], 
+                errors="ignore"
             )
-
-            # Remove colunas auxiliares para deixar a tabela visualmente limpa
-            df_operacao = df_operacao.drop(columns=["Ordem_Status", "Data_Ref"])
 
             return df_operacao
 
         except Exception as e:
+            print(f"Erro na tentativa {tentativa}: {e}")
             time.sleep(1)
-            if tentativa == 2:
-                st.error(f"Erro persistente ao conectar com o Google Sheets: {e}")
-                return pd.DataFrame()
+            continue
 
     return pd.DataFrame()
