@@ -19,12 +19,13 @@ from src.back.data_loader import (
     obter_timestamp_pasta, 
     ler_arquivo_upload
 )
-from src.back.coletas import carregar_coletas_pendentes
+from src.back.coletas import carregar_coletas_pendentes, carregar_coletas_atendimento
 from src.back.bases_hubs import processar_base_hubs
 
 from src.front.views_saida import exibir_visao_saida
 from src.front.views_volumes import exibir_visao_volumes
 from src.front.views_coletas import exibir_visao_coletas
+from src.front.views_atendimento import exibir_visao_atendimento
 from src.front.views_sla import exibir_visao_sla
 from src.front.views_mapa import exibir_visao_mapa
 
@@ -52,12 +53,13 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Mapeamento amigável para o seletor manual
+    # Mapeamento amigável para o seletor manual (incluindo Atendimento)
     opcoes_telas = {
         "Notas": "Notas Recebidas",
         "Volumes": "Volumes & Clientes",
         "SLA": "Radar de SLA & Alertas",
-        "Coletas": "Controle de Transporte",
+        "Coletas": "Controle Operacional (Pendentes)",
+        "Atendimento": "Atendimento (Trânsito & Entregues)",
         "Mapa": "Malha de Hubs & Bases"
     }
     opcoes_invertidas = {v: k for k, v in opcoes_telas.items()}
@@ -65,7 +67,7 @@ with st.sidebar:
     escolha_manual = st.radio(
         "Selecione a Visão:",
         list(opcoes_telas.values()),
-        index=list(opcoes_telas.keys()).index(st.session_state.tela_ativa)
+        index=list(opcoes_telas.keys()).index(st.session_state.tela_ativa) if st.session_state.tela_ativa in opcoes_telas else 0
     )
     
     if not st.session_state.modo_tv:
@@ -95,27 +97,19 @@ else:
 
 with st.spinner("Sincronizando fila de coletas..."):
     df_coletas = carregar_coletas_pendentes()
+    df_atendimento = carregar_coletas_atendimento()
 
-# Pergunta ao sistema: "Quando foi a última vez que o ficheiro bases_hubs.xlsx foi modificado?"
-def obter_timestamp_hubs():
-    caminho = "data/bases_hubs.xlsx" if os.path.exists("data/bases_hubs.xlsx") else "bases_hubs.xlsx"
-    return os.path.getmtime(caminho) if os.path.exists(caminho) else 0
-
-
-# Pergunta ao sistema: "Qual a data/hora da última alteração no arquivo bases_hubs.xlsx?"
 def obter_modificacao_planilha_hubs():
     caminho = "data/bases_hubs.xlsx" if os.path.exists("data/bases_hubs.xlsx") else "bases_hubs.xlsx"
     return os.path.getmtime(caminho) if os.path.exists(caminho) else 0
 
-# O Streamlit só usa o cache se a data de modificação da planilha for a mesma!
-# Se você salvar uma linha nova, a data muda e ele recarrega na hora:
 @st.cache_data
 def carregar_dados_mapa(timestamp_arquivo):
     return processar_base_hubs()
 
 df_mapa = carregar_dados_mapa(obter_modificacao_planilha_hubs())
 
-# --- 2. Ponto de Inclusão: RENDERIZAÇÃO DA TELA SELECIONADA ---
+# --- RENDERIZAÇÃO DA TELA SELECIONADA ---
 if st.session_state.tela_ativa == "Notas":
     exibir_visao_saida(df_operacao)
 elif st.session_state.tela_ativa == "Volumes":
@@ -124,20 +118,23 @@ elif st.session_state.tela_ativa == "SLA":
     exibir_visao_sla(df_operacao)
 elif st.session_state.tela_ativa == "Coletas":
     exibir_visao_coletas(df_coletas)
+elif st.session_state.tela_ativa == "Atendimento":
+    exibir_visao_atendimento(df_atendimento)
 elif st.session_state.tela_ativa == "Mapa":
     exibir_visao_mapa(df_mapa)
 
-# --- MECANISMO DO CARROSSEL AUTOMÁTICO (ROTAÇÃO CIRCULAR) ---
+# --- LÓGICA DE CARROSSEL DE TV (AUTO-ROTAÇÃO) ---
 if st.session_state.modo_tv:
     time.sleep(tempo_troca)
     
-    # Ordem: Notas -> Volumes -> SLA -> Coletas -> Mapa -> Notas
-    proxima_tela = {
-        "Notas": "Volumes",
-        "Volumes": "SLA",
-        "SLA": "Coletas",
-        "Coletas": "Mapa",
-        "Mapa": "Notas"
-    }
-    st.session_state.tela_ativa = proxima_tela.get(st.session_state.tela_ativa, "Notas")
+    # Ordem das telas na rotação da TV
+    ordem_telas = ["Notas", "Volumes", "SLA", "Coletas", "Atendimento", "Mapa"]
+    
+    try:
+        indice_atual = ordem_telas.index(st.session_state.tela_ativa)
+        proximo_indice = (indice_atual + 1) % len(ordem_telas)
+        st.session_state.tela_ativa = ordem_telas[proximo_indice]
+    except ValueError:
+        st.session_state.tela_ativa = "Notas"
+        
     st.rerun()
